@@ -31,7 +31,7 @@ SOFTWARE.
 */
 #include <Arduino.h>
 #include <SPI.h>
-#include <Adafruit_ILI9341esp.h>
+#include <Adafruit_ILI9341esp_read.h>
 #include <Adafruit_GFX.h>
 #include <XPT2046.h>
 #include <pgmspace.h>
@@ -189,6 +189,29 @@ void hand_img_preview(void) {
     generateBitmapImageByRow(
     		&callback_preview_row_by_row, &callback_writer, NULL, NULL,
     		lcd.height(), lcd.width());
+}
+void hand_lcd_status(void) {
+	http200();
+	bool row_addr_order, col_addr_order, row_col_exchange,
+       vert_refresh, rgbbgr, hor_refresh;
+	lcd.readDisplayStatus(&row_addr_order, &col_addr_order,
+            &row_col_exchange, &vert_refresh, &rgbbgr, &hor_refresh);
+	server.sendContent("<!DOCTYPE html><html><head><meta charset='UTF-8' /><title>Guidance</title>"
+		"<style type='text/css'>"
+		"</style></head><body><ul>");
+	server.sendContent("<li>row_addr_order: ");
+	server.sendContent(BOO(row_addr_order));
+	server.sendContent("<li>col_addr_order: ");
+	server.sendContent(BOO(col_addr_order));
+	server.sendContent("<li>row_col_exchange: ");
+	server.sendContent(BOO(row_col_exchange));
+	server.sendContent("<li>vert_refresh: ");
+	server.sendContent(BOO(vert_refresh));
+	server.sendContent("<li>rgbbgr: ");
+	server.sendContent(BOO(rgbbgr));
+	server.sendContent("<li>hor_refresh: ");
+	server.sendContent(BOO(hor_refresh));
+	server.sendContent("</ul></body></html>");
 }
 void hand_root(void) {
 	http200();
@@ -446,6 +469,7 @@ void setup() {
 	server.on(F("/"), hand_root );
 	server.on(F("/preview.bmp"), hand_img_preview );
 	server.on(F("/cs"), hand_cmd_list );
+	server.on(F("/lcd"), hand_lcd_status );
 	/* server.on(F("/tclr"), hand_tclr ); */
 	/* server.on(F("/font"), hand_font ); */
 	/* server.on(F("/rec"), cmd_rec ); */

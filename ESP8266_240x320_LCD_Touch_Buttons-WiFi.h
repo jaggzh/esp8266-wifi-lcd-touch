@@ -8,3 +8,6 @@ int cmd_txt(char *opts);    // t=txt,[x=#,][y=#]
 int cmd_pixel(char *opts);  // x=#,y=#
 int cmd_frect(char *opts);  // [x,y,w,h,r]=#s
 int cmd_off(char *val);
+void hand_lcd_status(void);
+
+#define BOO(b) (b ? "True" : "False")
