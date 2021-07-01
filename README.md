@@ -49,7 +49,8 @@ off                        Not implemented. (Turn off display)
 
 ## Setup
 1. Copy wifi\_config--example.h to wifi\_config.h and put your settings in there
-2. You'll have to get your LCD working yourself.  I use a particular ILI9341 320x240 board on my ESP8266.  I designed an adapter board for it (see See also section)
+2. Grab [https://github.com/jaggzh/Adafruit_ILI9341esp_read](https://github.com/jaggzh/Adafruit_ILI9341esp_read) -- Your LCD needs a ram read function. I modified the above ESP8266-augmented Adafruit\_ILI9341 graphics library, and I put it at: ~/Arduino/libraries/Adafruit\_ILI9341esp/
+3. This ^ library works with the ESP8266 and ILI9341 boards, but, again, that RAMRD function might be specific to this TJCTM24028-SPI LCD.
 
 ## See also
 
