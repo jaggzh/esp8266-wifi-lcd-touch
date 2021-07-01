@@ -54,7 +54,8 @@ off                        Not implemented. (Turn off display)
 
 ## See also
 
-* This includes a copy of [Jaggz's BMP Secretion Library](https://github.com/jaggzh/lib-secrete-bmp) (a memory-efficient pixel-by-pixel or row-by-row generation of BMP images)
+* [https://github.com/jaggzh/Adafruit_ILI9341esp_read](https://github.com/jaggzh/Adafruit_ILI9341esp_read) (See Setup above)
+* This includes a copy of [Jaggz's BMP Secretion Library](https://github.com/jaggzh/lib-secrete-bmp) (a memory-efficient pixel-by-pixel or row-by-row generation of BMP images). You don't need to download it; it's in here.
 * For convenience, I designed an adapter board going between the LCD and the ESP8266 [ILI9341 / TJCTM24028-SPI - ESP8266 Adapter Board](https://oshpark.com/shared_projects/dopTFnBT).
 * The enclosure needs some work so I've not published it yet. Sorry.
 
