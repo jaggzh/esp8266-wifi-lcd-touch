@@ -3,12 +3,14 @@
 Hits to the esp's webserver at http://{ip}/cs? let you send text, colors, boxes, etc. to display.
 
 ### Some commands (which are sent as web parameters, and may be appended):
+
 ```
 cls=r=100          # Clears the screen with a dark red background
 txt=t=Hello+World  # Displays text, using the current
                    #  self-advancing cursor position
 txt=x=0,t=Hello+World  # Picks an x position (y will also be 0 now)
                        #  and displays text
+```
 
 ### Initial test image during development of web-preview
 
@@ -30,6 +32,7 @@ That command:
 6. tfg= sets the rgb for the next text (foreground) color
 
 ### Current commands:
+
 ```
 txt=x=#,y=#,s=#,t=String   (x,y,s optional)
 tfg=r=#,g=#,b=#            (r,g,b optional (sort of). Default to 0 if not specified)
@@ -40,6 +43,7 @@ frect=#,#,#,#,#            x,y,width,height,radius (all required I think)
 off                        Not implemented. (Turn off display)
                            (My adaptor board currently feeds HIGH to the LCD on
                            pin so I can't test this functionality yet).
+```
 
 ## Setup
 1. Copy wifi\_config--example.h to wifi\_config.h and put your settings in there
