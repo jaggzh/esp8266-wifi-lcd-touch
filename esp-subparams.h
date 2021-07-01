@@ -1,41 +1,51 @@
-UnDo
-			#ifdef SUBPARAM_SERIAL_DEBUG
-				spsp("  Command='");
-				spsp(val);
-				spspl("' (txt)");
-				#endif5
-			spsp("    var:"); spsp(5
-			spsp("    rest:"); spsp(5
--			spsp("    Arg: "); spsp(_arg); spsp(", ");5
-.			spsp("     Arg: "); spsp(_arg); spsp(", ");5
-.			spsp("     arg: "); spsp(_arg); spsp(", ");5
-#			spsp("    rest:"); spspl(_rest);5
-.			spsp("     _rg: "); spsp(_arg); spsp(", ");5
-;#define spsp(a)  Serial.print(a)    // Just for convenience
-"#define spspl(a) Serial.println(a)5
-$			spsp("    _rest:"); spspl(_rest);5
-class SubParams {5
-				spspl(subval);
-				spsp(" = ");
-				spsp(subvar);
-				spsp("(w/val) ");
-				spspl(subvar);
-				spsp("(plain) ");
-/			spsp("     _arg: "); spsp(_arg); spsp(", ");5
-			sp("next()");5
-#			sp("esp-subparams.h -> next()");5
-				sp(" = ");
-				sp(subvar);
-				sp("(w/val) ");
-				sp("(plain) ");
-)			sp("     _arg: "); sp(_arg); sp(", ");
- 			sp("    _rest:"); spl(_rest);
-%#include "printutils.h" // sp() spl()5
-				spl(subval);
-				spl(subvar);
-"			dbsp("    _rest:"); spl(_rest);
-$			spl("esp-subparams.h -> next()");
-'#include "printutils.h" // dbsp() spl()5
-				
-+			dbsp("     _arg: "); sp(_arg); sp(", ");5
-&			dbspl("esp-subparams.h -> next()");5
+#define SUBPARAM_SERIAL_DEBUG
+/* For splitting query parameters into additional params
+ * Example:
+ *   char *str="a=b,c=d,e";
+ *   SubParams pset(str);
+ *   while (pset.next(&var, &val)) {
+ *      // 'var' and 'val are now a NUL-terminated strings (char *)
+ *      //   1st call: var=="a", b=="b"
+ *      //   3rd call: var=="e", b==NUL
+ *   }
+ */
+#include "printutils.h" // dbsp() dbspl()
+class SubParams {
+	private:
+		char *_val;
+		char *_arg;
+		char *_rest;
+	public:
+		SubParams(char *val) {
+			_val = val;
+			_rest = val;
+			dbsp("esp-subparams.h -> New pset with val: ");
+			dbspl(val);
+		};
+		int next(char **var, char **val) {
+			dbspl("esp-subparams.h -> next()");
+			dbsp("    _rest:"); dbspl(_rest);
+			if (!(_arg=strtok_r(_rest, ",", &_rest))) {
+				dbspl("  Done with params");
+				return 0;
+			}
+			dbsp("     _arg: "); dbsp(_arg); dbsp(", ");
+			char *subvar=_arg;
+			char *subval=strchr(_arg, '=');
+			if (!subval) {
+				dbsp("(plain) ");
+				dbspl(subvar);
+				*var = subvar;
+				*val = NULL;
+			} else {
+				*(subval++) = 0;
+				dbsp("(w/val) ");
+				dbsp(subvar);
+				dbsp(" = ");
+				dbspl(subval);
+				*var = subvar;
+				*val = subval;
+			}
+			return 1;
+		}
+};

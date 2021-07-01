@@ -8,6 +8,7 @@ tags: *.cpp *.c *.ino *.h
 
 vi:
 	vim Makefile \
+		README.md \
 		ESP8266_240x320_LCD_Touch_Buttons-WiFi.ino \
 		ESP8266_240x320_LCD_Touch_Buttons-WiFi.h \
 		esp-subparams.h \
@@ -15,7 +16,6 @@ vi:
 		colorstuff.h \
 		non-arduino.h \
 		printutils.h \
-		testc.cpp \
 		settings.h \
 		ota.* \
 		wifi_config--example.h \
