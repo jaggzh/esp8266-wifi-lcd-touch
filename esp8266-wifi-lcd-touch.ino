@@ -196,6 +196,30 @@ void hand_img_preview(void) {
     		&callback_preview_row_by_row, &callback_writer, NULL, NULL,
     		lcd.height(), lcd.width());
 }
+void hand_post_img(void) {
+	HTTPUpload &upload = server.upload();
+	if (upload.status == UPLOAD_FILE_START) {
+		String filename = upload.filename;
+		if (!filename.startsWith("/")) filename = "/"+filename;
+		Serial.print("handleFileUpload Name: ");
+		Serial.println(filename);
+		//fsUploadFile = SPIFFS.open(filename, "w");     // Open the file for writing in SPIFFS (create if it doesn't exist)
+		filename = String();
+	} else if (upload.status == UPLOAD_FILE_WRITE) {
+		/* if (fsUploadFile) */
+		/* 	fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file */
+	} else if (upload.status == UPLOAD_FILE_END) {
+		/* if (fsUploadFile) {                                    // If the file was successfully created */
+		/* 	fsUploadFile.close();                               // Close the file again */
+		/* 	Serial.print("handleFileUpload Size: "); */
+		/* 	Serial.println(upload.totalSize); */
+		/* 	server.sendHeader("Location","/success.html");      // Redirect the client to the success page */
+		/* 	server.send(303); */
+		/* } else { */
+		/* 	server.send(500, "text/plain", "500: couldn't create file"); */
+		/* } */
+	}
+}
 void hand_lcd_status(void) {
 	http200();
 	bool row_addr_order, col_addr_order, row_col_exchange,
@@ -483,6 +507,11 @@ void setup() {
 	server.on(F("/preview.bmp"), hand_img_preview );
 	server.on(F("/cs"), hand_cmd_list );
 	server.on(F("/lcd"), hand_lcd_status );
+	server.on(F("/img"), HTTP_POST,
+	[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive
+		hand_post_img                 // Receive and save the file
+	);
+
 	/* server.on(F("/tclr"), hand_tclr ); */
 	/* server.on(F("/font"), hand_font ); */
 	/* server.on(F("/rec"), cmd_rec ); */
