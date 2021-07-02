@@ -170,6 +170,12 @@ unsigned char *callback_preview_row_by_row(void *cbd) {
 	if (row==NULL) row = (unsigned char *)malloc(w*3+3); // rgb*width + 1 for dumb
 	y--;
 	lcd.readRow(row, y);
+	for (int i=0; i<w*3; i+=3) {
+		unsigned char c;
+		c        = row[i+0];
+		row[i+0] = row[i+2];
+		row[i+2] = c;
+	}
 	if (y <= 0) y=lcd.height();
 	return row;
 }
@@ -272,6 +278,7 @@ void hand_cmd_list() {
 }
 int cmd_off(char *val) {
 	lcd.displayOff();
+	return 1;
 }
 int cmd_font(char *name) { // f=[sbn]
 	String font;
@@ -282,7 +289,8 @@ int cmd_font(char *name) { // f=[sbn]
 	/* else if (name[0]='n') lcd.setFont(SevenSegNumFont); */
 	/* else { */
 		http500();
-		server.sendContent("Not a font\n");
+		//server.sendContent("Not a font\n");
+		server.sendContent("Not implemented\n");
 		return 1;
 	/* } */
 	/* return 0; */
@@ -438,7 +446,7 @@ void initial_display() {
 	cmd_txt(val);
 	strcpy(val, "b=255");
 	if (!cmd_color(txtfg, val)) lcd.setTextColor(txtfg.c);
-	strcpy(val, "s=6,t=BHAT");
+	strcpy(val, "y=50,s=6,t=BHAT\nMeringue");
 	cmd_txt(val);
 }
 void setup() {
