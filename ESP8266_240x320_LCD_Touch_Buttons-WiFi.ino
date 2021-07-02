@@ -265,9 +265,12 @@ void hand_cmd_list() {
 		} else if (cmd.equals("off")) {
 			spl("  COMMAND: off");
 			cmd_off(val);
+		} else if (cmd.equals("rect")) {
+			spl("  COMMAND: rect");
+			cmd_rect(val, 0); // filled
 		} else if (cmd.equals("frect")) {
 			spl("  COMMAND: frect");
-			cmd_frect(val);
+			cmd_rect(val, 1); // filled
 		} else {
 			http500();
 			server.sendContent("Unknown command: " + cmd + "\n");
@@ -325,7 +328,8 @@ int cmd_txt(char *opts) {
 	lcd.print(txt);
 	return 0;
 }
-int cmd_frect(char *opts) {
+
+int cmd_rect(char *opts, bool filled=0) {
 	SubParams pset(opts); // for &foo=a=b,c=d,e...
 	char *var, *val;
 	int args[5] = {1,1,15,5,1}; // x,y,w,h,r
@@ -346,7 +350,8 @@ int cmd_frect(char *opts) {
 		sp(" h:"); sp(args[3]);
 		sp(" r:"); sp(args[4]);
 		sp(" c:"); spl(nxtclr.c);
-		lcd.fillRoundRect(args[0], args[1], args[2], args[3], args[4], nxtclr.c);
+		if (filled) lcd.fillRoundRect(args[0], args[1], args[2], args[3], args[4], nxtclr.c);
+		else        lcd.drawRoundRect(args[0], args[1], args[2], args[3], args[4], nxtclr.c);
 	}
 	return 0;
 }
