@@ -40,7 +40,7 @@ SOFTWARE.
 //#include <ESP8266mDNS.h> 
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include "ESP8266_240x320_LCD_Touch_Buttons-WiFi.h"
+#include "esp8266-wifi-lcd-touch.h"
 #include "printutils.h"
 #define __MAIN_INO__
 #include "wifi_config.h" // This sets actual values (gross): ssid, password. ip, gw, nm
@@ -197,6 +197,7 @@ void hand_img_preview(void) {
     		lcd.height(), lcd.width());
 }
 void hand_post_img(void) {
+	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
 	HTTPUpload &upload = server.upload();
 	if (upload.status == UPLOAD_FILE_START) {
 		String filename = upload.filename;
@@ -507,8 +508,10 @@ void setup() {
 	server.on(F("/preview.bmp"), hand_img_preview );
 	server.on(F("/cs"), hand_cmd_list );
 	server.on(F("/lcd"), hand_lcd_status );
+
+	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
 	server.on(F("/img"), HTTP_POST,
-	[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive
+		[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive
 		hand_post_img                 // Receive and save the file
 	);
 
