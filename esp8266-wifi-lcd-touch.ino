@@ -253,7 +253,6 @@ void hand_lcd_status(void) {
 	server.sendContent(BOO(hor_refresh));
 	server.sendContent("</ul></body></html>");
 	server.sendContent("");
-    return true;
 }
 bool hand_root(void) {
 	http200();
@@ -538,7 +537,7 @@ void setup() {
 }
 void loop() {
 	uint16_t x, y;
-	loop_check_wifi(loop_millis);
+	loop_check_wifi();
 	loop_ota();
 	server.handleClient();
 

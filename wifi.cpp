@@ -6,6 +6,7 @@
 #define __WIFI_CPP
 #include "wifi_config.h"
 #include "printutils.h"
+#include "wifi.h"
 
 void setup_wifi(void) {
 	WiFi.mode(WIFI_STA);
@@ -25,7 +26,7 @@ bool setup_wait_wifi(int timeout_s) {
 	int mil = millis();
 	bool ret;
 	while (((millis() - mil)/1000) < timeout_s) {
-		ret = loop_check_wifi(1000); // after 3s this fn will start printing to serial
+		ret = loop_check_wifi(); // after 3s this fn will start printing to serial
 		if (ret) return ret;
 		delay(1000);
 	}

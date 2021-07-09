@@ -17,7 +17,10 @@ vi:
 		non-arduino.h \
 		printutils.h \
 		settings.h \
-		ota.* \
+		ota.cpp \
+		ota.h \
+		wifi.cpp \
+		wifi.h \
 		wifi_config--example.h \
 		wifi_config.h \
 		libsecretebmp.c \
