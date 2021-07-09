@@ -43,10 +43,14 @@ SOFTWARE.
 #include "esp8266-wifi-lcd-touch.h"
 #include "printutils.h"
 #define __MAIN_INO__
-#include "wifi_config.h" // This sets actual values (gross): ssid, password. ip, gw, nm
-#include "ota.h"
 #include "settings.h"
 #include "libsecretebmp.h"
+
+#include "wifi_config.h" // This sets actual values (gross): ssid, password. ip, gw, nm
+#include "printutils.h"
+#include "ota.h"
+#include "wifi.h"
+
 #define ESP_SPI_FREQ 4000000
 /* IMAGE data */
 #define img_big_w 320
@@ -182,20 +186,24 @@ unsigned char *callback_preview_row_by_row(void *cbd) {
 void callback_writer(unsigned char *data, int size, int nmemb, void *cbdata) {
 	server.sendContent((const char*) data, size*nmemb);
 }
-void hand_img_preview_by_pixel(void) {
+bool hand_img_preview_by_pixel(void) {
 	http200plain();
 	httpbmp();
     generateBitmapImageByRow(
     		&callback_preview_row_by_pixel, &callback_writer, NULL, NULL,
     		lcd.height(), lcd.width());
+    return true;
 }
-void hand_img_preview(void) {
+bool hand_img_preview(void) {
 	http200plain();
 	httpbmp();
     generateBitmapImageByRow(
     		&callback_preview_row_by_row, &callback_writer, NULL, NULL,
     		lcd.height(), lcd.width());
+	server.sendContent("");
+    return true;
 }
+
 void hand_post_img(void) {
 	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
 	HTTPUpload &upload = server.upload();
@@ -221,6 +229,7 @@ void hand_post_img(void) {
 		/* } */
 	}
 }
+
 void hand_lcd_status(void) {
 	http200();
 	bool row_addr_order, col_addr_order, row_col_exchange,
@@ -243,8 +252,10 @@ void hand_lcd_status(void) {
 	server.sendContent("<li>hor_refresh: ");
 	server.sendContent(BOO(hor_refresh));
 	server.sendContent("</ul></body></html>");
+	server.sendContent("");
+    return true;
 }
-void hand_root(void) {
+bool hand_root(void) {
 	http200();
 	server.sendContent("<!DOCTYPE html><html><head><meta charset='UTF-8' /><title>Guidance</title>"
 		"<style type='text/css'>"
@@ -252,8 +263,10 @@ void hand_root(void) {
 	server.sendContent("<img src=/preview.bmp /><br />");
 	server.sendContent("</style></head><body>");
 	server.sendContent("</body></html>");
+	server.sendContent("");
+    return true;
 }
-void hand_cmd_list() {
+bool hand_cmd_list() {
 	// /cs?font=&f=b&|=&txt=&
 	for (uint8_t i=0; i<server.args(); i++) {
 		String cmd=server.argName(i);
@@ -292,7 +305,7 @@ void hand_cmd_list() {
 			cmd_off(val);
 		} else if (cmd.equals("rect")) {
 			spl("  COMMAND: rect");
-			cmd_rect(val, 0); // filled
+			cmd_rect(val, 0); // NOT filled
 		} else if (cmd.equals("frect")) {
 			spl("  COMMAND: frect");
 			cmd_rect(val, 1); // filled
@@ -303,6 +316,8 @@ void hand_cmd_list() {
 	}
 	http200();
 	server.sendContent("k\n");
+	server.sendContent("");
+    return true;
 }
 int cmd_off(char *val) {
 	lcd.displayOff();
@@ -464,21 +479,22 @@ void handleNotFound() {
 	server.send ( 404, "text/plain", msg );
 	digitalWrite ( LEDPIN, 0 );
 }
+#define SC(d,s) strcpy(d,s)
 void initial_display() {
 	char val[30];
-	strcpy(val, "r=255");
-	if (!cmd_color(txtfg, val)) lcd.setTextColor(txtfg.c);
-	strcpy(val, "x=20,s=3,t=WHAT");
-	cmd_txt(val);
-	strcpy(val, "g=255");
-	if (!cmd_color(txtfg, val)) lcd.setTextColor(txtfg.c);
-	strcpy(val, "s=4,t=GHAT");
-	cmd_txt(val);
-	strcpy(val, "b=255");
-	if (!cmd_color(txtfg, val)) lcd.setTextColor(txtfg.c);
-	strcpy(val, "y=50,s=6,t=BHAT\nMeringue");
-	cmd_txt(val);
+	cmd_clear(SC(val, "r=0"));
+	//if (!cmd_color(nxtclr, SC(val, "r=200,g=300,b=250")) lcd.setTextColor(nxtclr.c);
+	cmd_color(nxtclr, SC(val, "r=200,g=300,b=250"));
+	cmd_rect(SC(val, "1,1,318,238,20"), false);
+	cmd_rect(SC(val, "2,2,316,236,19"), false);
+	cmd_color(txtfg, SC(val, "b=200,g=100"));
+	cmd_txt(SC(val, "y=20,s=3,t=+Reminders:%0a"));
+	cmd_color(txtfg, SC(val, "r=200"));
+	cmd_txt(SC(val, "s=5,t=+NAC%0a+E%0a+D%0a"));
+	cmd_color(txtfg, SC(val, "b=200,g=100"));
+	cmd_txt(SC(val, "s=4,t=+Dance!"));
 }
+
 void setup() {
 	Serial.begin(115200);
 	SPI.setFrequency(ESP_SPI_FREQ);
@@ -496,14 +512,10 @@ void setup() {
 	//lcd.setFont(BigFont);
 	//lcd.setTextColor(0xFFFF, 0); // white on black
 	//drawButtons();
-	WiFi.mode(WIFI_STA);
-	WiFi.config(ip, gw, nm);
-	WiFi.begin(ssid, password);
+	setup_wifi();
+	setup_wait_wifi(10); // wait max 10s
+	setup_ota();
 	sp(F("Connecting to wife..."));
-	/* while (WiFi.waitForConnectResult() != WL_CONNECTED) */
-	/* 	{ spl(F("Conn. fail! Rebooting...")); delay(5000); ESP.restart(); } */
-	WiFi.setAutoReconnect(true);
-	WiFi.persistent(true);       // reconnect to prior access point
 	server.on(F("/"), hand_root );
 	server.on(F("/preview.bmp"), hand_img_preview );
 	server.on(F("/cs"), hand_cmd_list );
@@ -524,39 +536,17 @@ void setup() {
 	Serial.println ( F("HTTP svr started") );
 	initial_display();
 }
-void check_wifi() {
-	static int connected=false;
-	static int last_wifi_millis = loop_millis;
-	if (loop_millis - last_wifi_millis > 3000) {
-		last_wifi_millis = loop_millis;
-		if (WiFi.status() == WL_CONNECTED) {
-			if (!connected) { // only if we toggled state
-				connected = true;
-				sp(F("Just connected to "));
-				sp(ssid);
-				sp(". IP: ");
-				spl(WiFi.localIP());
-			}
-		} else {
-			if (!connected) {
-				spl(F("Still not connected"));
-			} else { // only if we toggled state
-				connected=false;
-				spl(F("Lost WiFi connection. Will try again."));
-			}
-		}
-	}
-}
 void loop() {
 	uint16_t x, y;
+	loop_check_wifi(loop_millis);
+	loop_ota();
+	server.handleClient();
+
 	loop_millis=millis();
 	if (touch.isTouching()) {
 		touch.getPosition(x, y);
 		Serial.println("Touching... x: "+ String(x) + ", y: " + String(y));
 	}
-	check_wifi();
-	server.handleClient();
-	loop_ota();
 	//yield();
 }
 

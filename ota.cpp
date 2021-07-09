@@ -1,4 +1,4 @@
-#include "settings.h"
+#include "wifi_config.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
@@ -28,6 +28,7 @@ void setup_ota(void) {
 
   ArduinoOTA.onEnd([]() {
     Serial.println("\nEnd");
+    ESP.restart();
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
