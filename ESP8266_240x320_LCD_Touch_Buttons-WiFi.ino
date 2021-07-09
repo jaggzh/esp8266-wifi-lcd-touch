@@ -489,6 +489,13 @@ void setup() {
 	server.on(F("/preview.bmp"), hand_img_preview );
 	server.on(F("/cs"), hand_cmd_list );
 	server.on(F("/lcd"), hand_lcd_status );
+
+	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
+	server.on(F("/img"), HTTP_POST,
+		[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive
+		hand_post_img                 // Receive and save the file
+	);
+
 	/* server.on(F("/tclr"), hand_tclr ); */
 	/* server.on(F("/font"), hand_font ); */
 	/* server.on(F("/rec"), cmd_rec ); */

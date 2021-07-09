@@ -18,17 +18,26 @@ void setup_wifi(void) {
 	WiFi.persistent(true);       // reconnect to prior access point
 }
 
+// Wait max of passed seconds for wifi
+// Returns true immediately upon success
+// False after timeout expires
 bool setup_wait_wifi(int timeout_s) {
 	int mil = millis();
+	bool ret;
 	while (((millis() - mil)/1000) < timeout_s) {
-
+		ret = loop_check_wifi(1000); // after 3s this fn will start printing to serial
+		if (ret) return ret;
+		delay(1000);
+	}
+	return false;
 }
 
-void loop_check_wifi(int loop_millis) {
+bool loop_check_wifi() {
 	static int connected=false;
-	static int last_wifi_millis = loop_millis;
-	if (loop_millis - last_wifi_millis > 3000) {
-		last_wifi_millis = loop_millis;
+	int cur_millis = millis();
+	static int last_wifi_millis = cur_millis;
+	if (cur_millis - last_wifi_millis > 3000) {
+		last_wifi_millis = cur_millis;
 		if (WiFi.status() == WL_CONNECTED) {
 			if (!connected) { // only if we toggled state
 				connected = true;
@@ -36,6 +45,7 @@ void loop_check_wifi(int loop_millis) {
 				sp(ssid);
 				sp(". IP: ");
 				spl(WiFi.localIP());
+				return true;
 			}
 		} else {
 			if (!connected) {
@@ -46,4 +56,5 @@ void loop_check_wifi(int loop_millis) {
 			}
 		}
 	}
+	return false;
 }
