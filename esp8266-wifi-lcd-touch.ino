@@ -200,9 +200,36 @@ bool hand_img_preview(void) {
     generateBitmapImageByRow(
     		&callback_preview_row_by_row, &callback_writer, NULL, NULL,
     		lcd.height(), lcd.width());
+	server.sendContent("");
     return true;
 }
-bool hand_lcd_status(void) {
+
+void hand_post_img(void) {
+	HTTPUpload &upload = server.upload();
+	if (upload.status == UPLOAD_FILE_START) {
+		String filename = upload.filename;
+		if (!filename.startsWith("/")) filename = "/"+filename;
+		Serial.print("handleFileUpload Name: ");
+		Serial.println(filename);
+		//fsUploadFile = SPIFFS.open(filename, "w");     // Open the file for writing in SPIFFS (create if it doesn't exist)
+		filename = String();
+	} else if (upload.status == UPLOAD_FILE_WRITE) {
+		/* if (fsUploadFile) */
+		/* 	fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file */
+	} else if (upload.status == UPLOAD_FILE_END) {
+		/* if (fsUploadFile) {                                    // If the file was successfully created */
+		/* 	fsUploadFile.close();                               // Close the file again */
+		/* 	Serial.print("handleFileUpload Size: "); */
+		/* 	Serial.println(upload.totalSize); */
+		/* 	server.sendHeader("Location","/success.html");      // Redirect the client to the success page */
+		/* 	server.send(303); */
+		/* } else { */
+		/* 	server.send(500, "text/plain", "500: couldn't create file"); */
+		/* } */
+	}
+}
+
+void hand_lcd_status(void) {
 	http200();
 	bool row_addr_order, col_addr_order, row_col_exchange,
        vert_refresh, rgbbgr, hor_refresh;
@@ -224,6 +251,7 @@ bool hand_lcd_status(void) {
 	server.sendContent("<li>hor_refresh: ");
 	server.sendContent(BOO(hor_refresh));
 	server.sendContent("</ul></body></html>");
+	server.sendContent("");
     return true;
 }
 bool hand_root(void) {
@@ -234,6 +262,7 @@ bool hand_root(void) {
 	server.sendContent("<img src=/preview.bmp /><br />");
 	server.sendContent("</style></head><body>");
 	server.sendContent("</body></html>");
+	server.sendContent("");
     return true;
 }
 bool hand_cmd_list() {
@@ -286,6 +315,7 @@ bool hand_cmd_list() {
 	}
 	http200();
 	server.sendContent("k\n");
+	server.sendContent("");
     return true;
 }
 int cmd_off(char *val) {
@@ -507,14 +537,15 @@ void setup() {
 }
 void loop() {
 	uint16_t x, y;
+	loop_check_wifi(loop_millis);
+	loop_ota();
+	server.handleClient();
+
 	loop_millis=millis();
 	if (touch.isTouching()) {
 		touch.getPosition(x, y);
 		Serial.println("Touching... x: "+ String(x) + ", y: " + String(y));
 	}
-	loop_check_wifi(loop_millis);
-	server.handleClient();
-	loop_ota();
 	//yield();
 }
 

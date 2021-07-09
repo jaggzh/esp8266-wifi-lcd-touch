@@ -9,8 +9,8 @@ tags: *.cpp *.c *.ino *.h
 vi:
 	vim Makefile \
 		README.md \
-		ESP8266_240x320_LCD_Touch_Buttons-WiFi.ino \
-		ESP8266_240x320_LCD_Touch_Buttons-WiFi.h \
+		esp8266-wifi-lcd-touch.ino \
+		esp8266-wifi-lcd-touch.h \
 		esp-subparams.h \
 		colorstuff.cpp \
 		colorstuff.h \

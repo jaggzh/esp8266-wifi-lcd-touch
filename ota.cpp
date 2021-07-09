@@ -28,6 +28,7 @@ void setup_ota(void) {
 
   ArduinoOTA.onEnd([]() {
     Serial.println("\nEnd");
+    ESP.restart();
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
