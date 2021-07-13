@@ -16,7 +16,8 @@ void setup_wifi(void);
  //
  // Once connected it will remember and won't output
  // again until the status changes.
-bool loop_check_wifi();
+bool loop_check_wifi();  // optional, for connection status Serial output
+void loop_wifi();        // Required for loop updates
 
 // Wait max of passed seconds for wifi
 // Returns true immediately upon success

@@ -11,6 +11,8 @@ vi:
 		README.md \
 		esp8266-wifi-lcd-touch.ino \
 		esp8266-wifi-lcd-touch.h \
+		wifi.cpp \
+		wifi.h \
 		esp-subparams.h \
 		colorstuff.cpp \
 		colorstuff.h \
@@ -19,8 +21,6 @@ vi:
 		settings.h \
 		ota.cpp \
 		ota.h \
-		wifi.cpp \
-		wifi.h \
 		wifi_config--example.h \
 		wifi_config.h \
 		libsecretebmp.c \

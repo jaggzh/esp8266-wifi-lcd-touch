@@ -31,4 +31,11 @@ IPAddress gw(192, 168, 1, 1);
 IPAddress nm(255, 255, 255, 0);
 #endif
 
+#define MQTT_IP         "192.168.1.11"     // IP of MQTT Broker
+#define MQTT_PORT       1883
+#define MQTT_USER       "mqtt_sub_user"    // set your user here
+#define MQTT_PW         "mqtt_sub_userpw"
+#define MQTT_CLIENTNAME "LCDClient"
+
+
 #endif

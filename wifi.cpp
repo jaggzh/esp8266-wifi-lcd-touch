@@ -4,9 +4,13 @@
 
 #define WIFI_CONFIG_GET_IPS
 #define __WIFI_CPP
+#include "esp8266-wifi-lcd-touch.h"
 #include "wifi_config.h"
 #include "printutils.h"
 #include "wifi.h"
+#include "EspMQTTClient.h"
+
+EspMQTTClient mqtt_client(MQTT_IP, MQTT_PORT, MQTT_USER, MQTT_PW, MQTT_CLIENTNAME);
 
 void setup_wifi(void) {
 	WiFi.mode(WIFI_STA);
@@ -31,6 +35,10 @@ bool setup_wait_wifi(int timeout_s) {
 		delay(1000);
 	}
 	return false;
+}
+
+void loop_wifi() {        // Required for loop updates
+	mqtt_client.loop();
 }
 
 bool loop_check_wifi() {
@@ -58,4 +66,13 @@ bool loop_check_wifi() {
 		}
 	}
 	return false;
+}
+
+void onConnectionEstablished() {
+	mqtt_client.subscribe("lr/lcd/px",[](const String & payload) {
+		mqtt_pixel(payload); },
+		/* main_debug(payload); }, */
+		1);
+		//Serial.println(payload);});
+	//client.publish("mytopic/test", "This is a message");
 }
