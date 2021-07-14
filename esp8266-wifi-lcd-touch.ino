@@ -434,11 +434,8 @@ int cmd_hline(char *opts) {
 	if (uclr) clr.updatec();
 	else      clr.c = nxtclr.c;
 	for (int i=0; i<IMG_BIG_W; i++) {
-		/* uint8_t r = (uint8_t)((i/(float)(IMG_BIG_W+1))); */
-		/* uint8_t g = (uint8_t)sqrtf((i/(float)(IMG_BIG_W+1))); */
-		/* uint8_t b = 255; */
 		/* sp("r:"); sp(r); sp(" g:"); sp(g); sp(" b:"); spl(b); */
-		row[i] = rgb24to565(b, g, r);
+		row[i] = clr.c;
 	}
 	lcd.writeRow(row, y);
 	//lcd.writeRow(row, *opts ? strtol(opts, NULL, 10) : 0);
@@ -483,9 +480,12 @@ int mqtt_pixel(String opts) {
 #define HEXVAL(c) (isdigit(c) ? ((c) - '0') : (toupper((c)) - 'A' + 10))
 uint8_t hex2_to_u8(char *s) { return HEXVAL(s[0])*16 + HEXVAL(s[1]); }
 
-uint16_t rowstr_to_colors(uint16_t *row, char *str) {
+uint16_t rowstr_to_colors(uint16_t *row, char *str, bool bgr) {
 	char *s = str;
 	uint16_t x=0;
+	spl("");
+	sp("rowstr_to_colors:");
+	spl(str);
 	for (; x<IMG_BIG_W; x++) {
 		uint8_t r, g, b;
 		if (!s[0] || !s[1]) break;
@@ -494,8 +494,13 @@ uint16_t rowstr_to_colors(uint16_t *row, char *str) {
 		g = hex2_to_u8(s);  s+=2;
 		if (!s[0] || !s[1]) break;
 		b = hex2_to_u8(s);  s+=2;
-		row[x] = rgb24to565(r, g, b);
+		if (bgr) row[x] = rgb24to565(b, g, r);
+		else row[x] = rgb24to565(r, g, b);
+		/* sp(b); sp(' '); */
+		/* sp(g); sp(' '); */
+		/* sp(r); */
 	}
+	/* spl(""); */
 	return x;
 }
 
@@ -504,18 +509,21 @@ int cmd_rgb_row(char *opts) {
 	SubParams pset(opts); // for &foo=a=b,c=d,e...
 	char *var, *val;
 	int x=0, y=0;
+	int w=0, h=0;
 	uint16_t row[IMG_BIG_W];
 	uint16_t userwidth;
 	server.sendContent("cmd_rgb_row() called\n");
 	while (pset.next(&var, &val)) {
 		if (*var == 'y') y=strtol(val, NULL, 10);
 		else if (*var == 'x') x=strtol(val, NULL, 10);
+		else if (*var == 'w') w=strtol(val, NULL, 10);
+		else if (*var == 'h') h=strtol(val, NULL, 10);
 		else if (*var == 'v') {
 			if (!val) {
 				server.sendContent("row: v missing value\n");
 				return 1;
 			} else {
-				userwidth = rowstr_to_colors(row, val);
+				userwidth = rowstr_to_colors(row, val, false);
 			}
 		} else {
 			http500();
@@ -528,7 +536,20 @@ int cmd_rgb_row(char *opts) {
 	//char s[5];
 	//sprintf(s, " %d ", y);
 	//lcd.print(s);
-	lcd.writeRow(row, y);
+	//lcd.writeRow(row, y);
+	/* sp("\nWriting row: (width:"); */
+	/* sp(userwidth); sp(":"); */
+	/* for (int i=0; i<userwidth; i++) { */
+	/* 	uint8_t r,g,b; */
+	/* 	rgb24from565(&r, &g, &b, row[i]); */
+	/* 	if (r) r=255; if (g) g=255; if (b) b=255; */
+	/* 	row[i] = rgb24to565(r, g, b); */
+	/* 	row[i] = rgb24to565(255,0,255); */
+	/* 	sp(row[i]); sp(' '); */
+	/* 	//row[i] = 0xffff; */
+	/* } */
+	/* spl("\nSending to lcd"); */
+	lcd.writeBlock(row, x, y, userwidth, 1);
 	//lcd.drawRGBBitmap(x, y, row, userwidth, 1);
 	server.sendContent(" done drawing...\n");
 	return 0;

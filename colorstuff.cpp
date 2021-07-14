@@ -13,8 +13,7 @@ uint16_t rgb24to565(uint8_t r, uint8_t g, uint8_t b) {
 	c = ((((uint16_t)r) / 8) << 11) |
 		((((uint16_t)g) / 4) << 5) |
 		(((uint16_t)b) / 8);
-	dbsp("565 c = ");
-	dbspl((int)c);
+	dbsp("565 c = "); dbspl((int)c);
 	return c;
 }
 void rgb24from565(uint8_t *rp, uint8_t *gp, uint8_t *bp, uint16_t c) {

@@ -15,5 +15,6 @@ int mqtt_pixel(String opts);
 void hand_lcd_status(void);
 void main_debug(String s); // output a string to lcd
 void lcd_notify_wifi_connect();
+uint16_t rowstr_to_colors(uint16_t *row, char *str, bool bgr=false);
 
 #define BOO(b) (b ? "True" : "False")
