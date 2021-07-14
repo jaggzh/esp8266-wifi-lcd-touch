@@ -79,6 +79,7 @@ uint8_t txtsize=1;
 ESP8266WebServer server(80); //main web server
 ESP8266HTTPUpdateServer httpUpdater;
 int img_width=0, img_height=0;
+uint16_t lcd_width=0, lcd_height=0;
 
 #if 0
 void drawButtons() {
@@ -342,6 +343,9 @@ bool hand_cmd_list() {
 		} else if (cmd.equals("frect")) {
 			spl("  COMMAND: frect");
 			cmd_rect(val, 1); // filled
+		} else if (cmd.equals("hline")) {
+			spl("  COMMAND: row");
+			cmd_hline(val);
 		} else {
 			http500();
 			server.sendContent("Unknown command: " + cmd + "\n");
@@ -406,6 +410,42 @@ void main_debug(String s) {
 	lcd.print(s);
 }
 
+int cmd_hline(char *opts) {
+	SubParams pset(opts); // for &row=y=#
+	char *var, *val;
+	uint16_t row[IMG_BIG_W];
+	uint16_t y=0;
+	ColorSet clr(0,0,0);
+	bool uclr=false; // user-chosen color selected
+	//memset(row, 255, IMG_BIG_W*3);
+	spl("Writing to row");
+	while (pset.next(&var, &val)) {
+		if (*var == 'y') y = !val ? 0 : strtol(val, NULL, 10);
+		else if (*var == 'r') clr.r = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else if (*var == 'g') clr.g = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else if (*var == 'b') clr.b = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else {
+			http500();
+			server.sendContent("hline: Invalid opt");
+			return 1;
+		}
+	}
+	sp("Writing to row: "); spl(y);
+	if (uclr) clr.updatec();
+	else      clr.c = nxtclr.c;
+	for (int i=0; i<IMG_BIG_W; i++) {
+		/* uint8_t r = (uint8_t)((i/(float)(IMG_BIG_W+1))); */
+		/* uint8_t g = (uint8_t)sqrtf((i/(float)(IMG_BIG_W+1))); */
+		/* uint8_t b = 255; */
+		/* sp("r:"); sp(r); sp(" g:"); sp(g); sp(" b:"); spl(b); */
+		row[i] = rgb24to565(b, g, r);
+	}
+	lcd.writeRow(row, y);
+	//lcd.writeRow(row, *opts ? strtol(opts, NULL, 10) : 0);
+	spl("Wrote to row");
+	return 0;
+}
+
 int cmd_rect(char *opts, bool filled=0) {
 	SubParams pset(opts); // for &foo=a=b,c=d,e...
 	char *var, *val;
@@ -437,6 +477,7 @@ int mqtt_pixel(String opts) {
 	char s[100];
 	opts.toCharArray(s, 100);
 	cmd_pixel(s);
+	return 1;
 }
 
 #define HEXVAL(c) (isdigit(c) ? ((c) - '0') : (toupper((c)) - 'A' + 10))
@@ -487,7 +528,8 @@ int cmd_rgb_row(char *opts) {
 	//char s[5];
 	//sprintf(s, " %d ", y);
 	//lcd.print(s);
-	lcd.drawRGBBitmap(x, y, row, userwidth, 1);
+	lcd.writeRow(row, y);
+	//lcd.drawRGBBitmap(x, y, row, userwidth, 1);
 	server.sendContent(" done drawing...\n");
 	return 0;
 }
@@ -592,16 +634,19 @@ void handleNotFound() {
 	server.send ( 404, "text/plain", msg );
 	digitalWrite ( LEDPIN, 0 );
 }
+
 #define SC(d,s) strcpy(d,s)
 void initial_display() {
 	char val[30];
 	cmd_clear(SC(val, "r=0"));
-	//if (!cmd_color(nxtclr, SC(val, "r=200,g=300,b=250")) lcd.setTextColor(nxtclr.c);
+
 	cmd_color(nxtclr, SC(val, "r=200,g=300,b=250"));
+	cmd_rect(SC(val, "0,0,319,239,21"), false);
 	cmd_rect(SC(val, "1,1,318,238,20"), false);
 	cmd_rect(SC(val, "2,2,316,236,19"), false);
 	cmd_color(txtfg, SC(val, "b=200,g=100"));
 	cmd_txt(SC(val, "y=20,s=3,t= Reminders:\n"));
+
 	/* cmd_color(txtfg, SC(val, "r=200")); */
 	/* cmd_txt(SC(val, "s=5,t= NAC\n E\n D\n")); */
 	/* cmd_color(txtfg, SC(val, "b=200,g=100")); */
@@ -616,17 +661,20 @@ void setup() {
 	touch.begin(lcd.height(), lcd.width());  // Must be done before setting rion
 	touch.setRotation(touch.ROT90);
 	lcd.fillScreen(0);
-	sp("tftx =");
-	sp(lcd.width());
-	sp(" tfty =");
-	spl(lcd.height());
+	lcd_width=lcd.width();
+	lcd_height=lcd.height();
+	sp("tftw =");
+	sp(lcd_width);
+	sp(" tfth =");
+	spl(lcd_height);
 	touch.setCalibration(209, 1759, 1775, 273);
 	//touch.setCalibration(234, 1696, 1776, 267);
 	//lcd.setFont(BigFont);
 	//lcd.setTextColor(0xFFFF, 0); // white on black
 	//drawButtons();
+	initial_display();
 	setup_wifi();
-	setup_wait_wifi(10); // wait max 10s
+	if (setup_wait_wifi(10)) lcd_notify_wifi_connect();  // wait max 10s
 	setup_ota();
 	sp(F("Connecting to wife..."));
 	server.on(F("/"), hand_root );
@@ -649,11 +697,34 @@ void setup() {
 	//server.getServer().setNoDelay(true);
 	server.begin();
 	Serial.println ( F("HTTP svr started") );
-	initial_display();
 }
+
+void lcd_notify_wifi_connect() {
+	uint16_t cx=lcd.getCursorX(), cy=lcd.getCursorY();
+	spl("Printing WIFI status");
+
+	lcd.setTextSize(3);
+
+	lcd.setCursor(lcd_width-22, lcd_height-26);
+	lcd.setTextColor(0);
+	lcd.print("+");
+
+	lcd.setCursor(lcd_width-20, lcd_height-26);
+	lcd.setTextColor(rgb24to565(100,255,255));
+	lcd.print("+");
+
+	lcd.setTextColor(txtfg.c);
+	lcd.setTextSize(txtsize);
+	lcd.setCursor(cx, cy);
+}
+
 void loop() {
 	uint16_t x, y;
-	loop_check_wifi();   // optional, for connection status Serial output
+	if (loop_check_wifi()) { // optional, for connection status Serial output
+		// just connected after being disconnected or at startup
+		lcd_notify_wifi_connect();
+
+	}
 	loop_wifi();         // Required for loop updates
 	loop_ota();
 	server.handleClient();
