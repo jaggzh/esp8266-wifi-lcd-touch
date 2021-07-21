@@ -9,6 +9,9 @@
  *      //   3rd call: var=="e", b==NUL
  *   }
  */
+#define SUBPARAM_SEP            ','
+#define SUBPARAM_SEP_INTERNAL   255
+
 #include "printutils.h" // dbsp() dbspl()
 class SubParams {
 	private:
@@ -17,9 +20,24 @@ class SubParams {
 		char *_rest;
 	public:
 		SubParams(char *val) {
+			uint16_t len=-1; // only check strlen if needed
 			_val = val;
 			_rest = val;
 			dbsp("esp-subparams.h -> New pset with val: ");
+			dbspl(val);
+			for (char *s=va; *s; s++) {
+				if (*s == ',') {         // txt=hi,,there,2ndopt
+					if (s[1] != SUBPARAM_SEP)     //     hi,there{255}2ndopt
+						*s = SUBPARAM_SEP_INTERNAL;
+					else {
+						if (len == -1) len = strlen(*s); // only once
+						memmove(s, s+1, len); // len-1, but include \0
+						len--;                // we just shortened str
+					}
+				}
+				if (len>0) len--;             // remaining length
+			}
+			dbsp("esp-subparams.h -> Parsed commas: ");
 			dbspl(val);
 		};
 		int next(char **var, char **val) {
