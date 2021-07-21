@@ -11,6 +11,11 @@ vi:
 		README.md \
 		esp8266-wifi-lcd-touch.ino \
 		esp8266-wifi-lcd-touch.h \
+		log.cpp \
+		log.h \
+		httptime.cpp \
+		httptime.h \
+		settings.h \
 		wifi.cpp \
 		wifi.h \
 		esp-subparams.h \
@@ -18,7 +23,6 @@ vi:
 		colorstuff.h \
 		non-arduino.h \
 		printutils.h \
-		settings.h \
 		ota.cpp \
 		ota.h \
 		wifi_config--example.h \

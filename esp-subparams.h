@@ -31,7 +31,7 @@ class SubParams {
 						*s = SUBPARAM_SEP_INTERNAL;
 					else {
 						if (len == -1) len = strlen(*s); // only once
-						memmove(s, s+1, len); // len-1, but include \0
+						memmove(s, s+1, len); // len-1 at s+1, but include \0
 						len--;                // we just shortened str
 					}
 				}

@@ -17,12 +17,16 @@ char password[] = SSID_PW;
 
 const char *update_user = WEBUPDATE_USER; // HTTP auth user for OTA http update
 const char *update_pw = WEBUPDATE_PW";  // HTTP auth password
+extern const char *timehosts[] = {  // hosts used (for HTTP time, not ntp)
+	"192.168.1.10",                 // one host has webserver running on it
+}
 
 #else // like: ifndef __MAIN_INO__
 extern const char *ssid;
 extern char password[];
 extern const char *update_user; // HTTP auth user for OTA http update
 extern const char *update_pw;  // HTTP auth password
+extern const char **timehosts; // hosts used (for HTTP time, not ntp)
 #endif
 
 #ifdef WIFI_CONFIG_GET_IPS
