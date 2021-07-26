@@ -38,18 +38,20 @@ bool setup_wait_wifi(int timeout_s) {
 }
 
 void loop_wifi() {        // Required for loop updates
-	mqtt_client.loop();
+	//mqtt_client.loop();
 }
 
 bool loop_check_wifi() {
 	static int connected=false;
 	int cur_millis = millis();
 	static int last_wifi_millis = cur_millis;
+	static int last_connect_millis = 0;
 	if (cur_millis - last_wifi_millis > 3000) {
 		last_wifi_millis = cur_millis;
 		if (WiFi.status() == WL_CONNECTED) {
 			if (!connected) { // only if we toggled state
 				connected = true;
+				last_connect_millis = cur_millis;
 				sp(F("Just connected to "));
 				sp(ssid);
 				sp(". IP: ");
@@ -59,6 +61,9 @@ bool loop_check_wifi() {
 		} else {
 			if (!connected) {
 				spl(F("Still not connected"));
+				if (cur_millis - last_connect_millis > MAX_MS_BEFORE_RECONNECT) {
+					WiFi.reconnect();
+				}
 			} else { // only if we toggled state
 				connected=false;
 				spl(F("Lost WiFi connection. Will try again."));

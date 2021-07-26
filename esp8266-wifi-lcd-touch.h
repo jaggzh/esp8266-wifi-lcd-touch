@@ -1,6 +1,8 @@
 #include "colorstuff.h"
 #include "esp-subparams.h"
 
+#define MAX_MS_BEFORE_RECONNECT 15000
+
 int cmd_txt(char *val);                 // txt=hello
 int cmd_font(char *name);               // fnt=[sbn]
 int cmd_color(ColorSet &clr, char *opts); //r=255,g=255,b=0

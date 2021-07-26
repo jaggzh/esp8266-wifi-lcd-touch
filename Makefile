@@ -11,13 +11,13 @@ vi:
 		README.md \
 		esp8266-wifi-lcd-touch.ino \
 		esp8266-wifi-lcd-touch.h \
+		wifi.cpp \
+		wifi.h \
 		log.cpp \
 		log.h \
 		httptime.cpp \
 		httptime.h \
 		settings.h \
-		wifi.cpp \
-		wifi.h \
 		esp-subparams.h \
 		colorstuff.cpp \
 		colorstuff.h \
