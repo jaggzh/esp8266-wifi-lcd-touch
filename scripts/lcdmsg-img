@@ -1,0 +1,300 @@
+#!/usr/bin/perl
+#
+# Transfers image to LCD.
+# Set $lip=, below, to your IP as a string.
+#
+# Currently this uses HTTP and the INO's handling of /img
+# It uses just the URL, sending chunks of image data, respecting
+# the URL maximum length of the Arduino ESP8266 libs.
+# (I have some of the code in to let it use POST, but for now it's
+# separate hits).
+#
+# See the options at GetOptions() below (or use -h or --help)
+# It now support --cb / --clipboard to pull an image directly from
+# the clipboard and transfer it to the display
+#
+# It doesn't handle re-sending on errors, so sometimes I'll get a black
+# line in an image transfer from a failed hit.
+#
+use strict; use warnings;
+use 5.24.3;
+use URI::Encode qw(uri_encode);
+use Imager;
+use List::Util qw(min max);
+use Getopt::Long;
+use Number::Range;
+use LWP::UserAgent ();
+my $ua = LWP::UserAgent->new(timeout => 1);
+$ua->agent("Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0");
+
+# ; this will error without the ; You're welcome
+my $lip = "{lcd display ip here}"
+
+my $xpos = -1;
+my $ypos = -1;
+my $verbose = 0;
+my $help = 0;
+my $no_center = 0;
+my $opt_scale = 100;
+my $opt_no_interlaced = 0;
+my $opt_interlaced_odd = 0;
+my $opt_interlaced_even = 0;
+my $opt_clipboard = 0;
+GetOptions("xpos|x=i" => \$xpos,
+		   "ypos|y=i" => \$ypos,
+		   "cb|clipboard" => \$opt_clipboard,
+		   "scale|s=i" => \$opt_scale,
+		   "nocenter|C" => \$no_center,
+		   "nointerlace|I" => \$opt_no_interlaced,
+		   "interlaced_odd|rodd|io|i" => \$opt_interlaced_odd,
+		   "interlaced_even|reven|ie" => \$opt_interlaced_even,
+		   "verbose|v"  => \$verbose,
+		   "help|h"  => \$help)
+	or die("Error in command line arguments\n");
+
+my $url;
+my $txt;
+my $maxw = 320;
+my $maxh = 240;
+my $maxuri = 600;
+my $cmdcnt = 0;
+my $do_row_rgb = 1;
+my $do_http = 0;
+
+if ($help || (!@ARGV && !$opt_clipboard)) {
+	print <<~"EOT";
+		Usage: me [options] {image filename}
+		Usage: me [options] {url}
+		Usage: me [options] --cb         # clipboard
+			--cb | --clipboard  Image from clipboard
+			-x   | --xpos #
+			-y   | --ypos #
+			-v   | --verbose
+			-s   | --scale {percentage OF LCD display}
+			-C   | --nocenter       -- Default is to center
+			-i   | -io | --iodd | --rodd | --interlaced_odd
+			                       -- Only img rows 1st, 3rd, ...
+			-ie | --ieven | --reven | --interlaced_even
+			                       -- Only img rows 2nd, 4th, ...
+		*Note: if image is image...-x+y.ext
+		       x and y are numbers for the offset (unless overridden by -x -y)
+	EOT
+	exit;
+}
+my $fn = shift(@ARGV);
+my ($lr, $lg, $lb, $la) = (-1) x 4;
+my $img = Imager->new;
+
+if ($opt_clipboard && (defined($fn) && $fn ne "")) {
+	print "You specified clipboard, but also gave a filename/url. Please don't\n";
+	exit 1;
+}
+
+sub get_image_from_clipboard {
+	my @targets = grep {m|^image/png\s*$|} `xclip -selection clipboard -o -t TARGETS`;
+	my $data = `xclip -selection clipboard -o -t image/png`;
+	$img->read(data => "$data") || die "Error reading image from clipboard: $!";
+}
+
+if ($opt_clipboard) {                     # User requested image from clipboard
+	get_image_from_clipboard();
+} elsif ($fn =~ m|^https?://|) {            # User requested URL
+	print "Retrieving image...\n";
+	my $response = $ua->get($fn);
+	if ($response->is_success) {
+		my $d = $response->decoded_content;
+		#print "  Length of retrieved data: ", length($d), "\n";
+		$img->read(data => $d);
+		#print "  Data: $d\n";
+		#open(F, ">", "foo.web") || die "no: $!";
+		#print F $d; close F;
+	} else {
+		print STDERR "ERROR: " . $response->status_line . "\n";
+	}
+} else {                                  # User requested file
+	$img->read(file=>$fn)
+		or die "Cannot read img: ", $img->errstr;
+}
+
+print "$img\n";
+print $img->getwidth(), "\n";
+## Scaling
+my $iw = $img->getwidth();
+my $ih = $img->getheight();
+if ($opt_scale != 100) {
+	$iw = int($maxw*$opt_scale / 100);
+	$ih = int($maxh*$opt_scale / 100);
+	$img = $img->scale(xpixels=>$iw, ypixels=>$ih, type=>'min');
+}
+if ($iw > $maxw || $ih > $maxh) {
+	$img = $img->scale(xpixels=>$maxw, ypixels=>$maxh, type=>'min');
+}
+
+my $h = min($maxh, $img->getheight());
+my $w = min($maxw, $img->getwidth());
+my @cmds;
+$|=1;
+#for my $y (0 .. 40) {
+
+if ($fn =~ /-(\d+)\+(\d+)\./) {
+	$xpos = $1 if $xpos == -1;
+	$ypos = $2 if $ypos == -1;
+}
+
+# If Centering (default) is on:
+$xpos = int(($maxw - $w) / 2) if $xpos==-1 && !$no_center;
+$ypos = int(($maxh - $h) / 2) if $ypos==-1 && !$no_center;
+
+# If centering is off, and we didn't get the position from the filename
+# nor from commandline args, just use 0,0
+
+$xpos = 0 if $xpos == -1;
+$ypos = 0 if $ypos == -1;
+
+my $maxpix=200;
+my $debugcounter=0;
+
+# DRAW ROWS.  (Handling interlacing options too)
+if ($opt_no_interlaced) {
+	for (my $y=0; $y<$h-1; $y++) { draw_row($y); }
+} else {
+	if ($opt_interlaced_even || (!$opt_interlaced_even && !$opt_interlaced_odd)) {
+		for (my $y=0; $y<$h-1; $y+=2) { draw_row($y); }
+	}
+	if ($opt_interlaced_odd || (!$opt_interlaced_even && !$opt_interlaced_odd)) {
+		for (my $y=1; $y<$h-1; $y+=2) { draw_row($y); }
+	}
+}
+
+sub draw_row {
+	my $y = shift;
+	my @line = $img->getscanline(y=>$y);
+	#print STDERR "[$y]";
+	my $row;
+	my $pixcnt;
+	my $startx;
+	$row="";
+	$pixcnt = 0;
+	$startx = 0;
+	for (my $x=0; $x<$#line+1; $x++) {
+		my ($r, $g, $b, $a) = $line[$x]->rgba();
+		if ($do_row_rgb) {
+			$row .= sprintf("%02x%02x%02x", $r, $g, $b);
+			$pixcnt++;
+			if ($pixcnt >= $maxpix) {
+				print STDERR "Lx[$y/" . $img->getheight() . "] $row\n";
+				send_row($startx+$xpos, $y+$ypos, $row);
+				#exit if (++$debugcounter > 10);
+				$pixcnt = 0;
+				$startx = $x+1;
+				$row='';
+			}
+		}
+		# ansi_xy1($x,$y);
+		# ansi_rgb($r,$g,$b);
+		#$DB::single = 1;
+		#pushpx(x=>$x, y=>$y, r=>$r, g=>$g, b=>$b);
+		# print STDERR " $x";
+	}
+	if ($pixcnt) { # some left at end of row, need to output
+		send_row($startx+$xpos, $y+$ypos, $row);
+		$pixcnt = 0;
+		$startx = 0;
+		$row='';
+	}
+}
+
+
+sub send_row {
+	my ($x, $y, $row) = @_;
+	my $url = "http://$lip/cs?row=x=$x,y=$y,v=$row";
+	#print STDERR "Sending [$y]\n";
+	my $response = $ua->get($url);
+	if ($response->is_success) {
+		print $response->decoded_content;
+	} else {
+		print STDERR "ERROR: " . $response->status_line . "\n";
+	}
+
+	#print STDERR "curl '$url'\n";
+	#exit;
+	# system("curl", $url);
+	#print STDERR "  Done [$y]\n";
+	#sleep(2);
+}
+
+sub ansi_rgb {
+	my ($r,$g,$b) = @_;
+	printf STDERR "\033[38;2;$r;$g;${b}m#";
+}
+sub ansi_xy1 {
+	my $x=shift; $x++;
+	my $y=shift; $y++;
+	printf STDERR "\033[$y;${x}H";
+}
+
+sub pushpx {
+	my %opts = @_;
+	my $x = $opts{x};
+	my $y = $opts{y};
+	my $r = $opts{r};
+	my $g = $opts{g};
+	my $b = $opts{b};
+	my $cmd;
+	if ($r ne $lr || $g ne $lg || $b ne $lb) {
+		my @cols;
+		push @cols, "r=$r" if $r;
+		push @cols, "g=$g" if $g;
+		push @cols, "b=$b" if $b;
+		push @cols, "r=0" if scalar(@cols) < 1;
+		$cmd = "x=$x,y=$y," . join(",", @cols);
+		$lr = $r;  $lg = $g;  $lb = $b;
+	} else {
+		if ($y && $x) {
+			$cmd = "x=$x,y=$y";
+		} elsif ($x) {
+			$cmd = "x=$x";
+		} elsif ($y) {
+			$cmd = "y=$y";
+		}
+	}
+	# print "$cmd\n";
+	# return;
+	if (!$do_http) {
+		system("mosquitto_pub", "-h", "localhost", "-t", "lr/lcd/px",
+			"-p", "63000",
+			"-u", "freedom", "-P", '7op$ecret',
+			"-m", $cmd);
+	} else {
+		pushcmd("px=$cmd");
+	}
+}
+
+sub cmdstr { return join("&", @cmds); }
+
+sub sendcmds {
+	my $url = "http://$lip/cs?" .  join('&', @cmds);
+	system("curl", $url);
+	print STDERR ++$cmdcnt, " ";
+	print STDERR "$url\n";
+}
+
+sub pushcmd {
+	my $cmd = shift;
+	if (length(cmdstr) + length($cmd) + 1 > $maxuri) {
+		sendcmds();
+		@cmds = ($cmd);
+	} else {
+		push @cmds, $cmd;
+	}
+}
+
+#print $img, "\n";
+# $txt = join('&', @ARGV);
+# $txt =~ s/\s/+/g;
+# $url = "http://$lip/cs?" . $txt;
+
+# say "URL: $url";
+# system("curl", $url);
+
+

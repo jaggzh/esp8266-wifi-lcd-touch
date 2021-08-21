@@ -2,6 +2,8 @@
 
 Hits to the esp's webserver at http://{ip}/cs? let you send text, colors, boxes, etc. to display.
 
+### Scripts to send stuff found in scripts/ (just lcdmsg-img for now)
+
 ### Some commands (which are sent as web parameters, and may be appended):
 
 ```
@@ -16,6 +18,7 @@ txt=x=0,t=Hello+World  # Picks an x position (y will also be 0 now)
 
 The web hit will load, live, a preview of what's on the LCD.  The RGB and BGR is reversed here (a bug I've not yet fixed).
 
+![Test shot](img/rose-test.jpg)
 ![Test shot](img/testshot.jpg)
 
 ### Full hit example:
