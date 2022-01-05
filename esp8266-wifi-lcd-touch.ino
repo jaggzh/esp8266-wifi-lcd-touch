@@ -31,6 +31,7 @@ SOFTWARE.
 */
 #include <Arduino.h>
 #include <SPI.h>
+#define ILI9341_USE_HW_CS
 #include <Adafruit_ILI9341esp_read.h>
 #include <Adafruit_GFX.h>
 #include <XPT2046.h>
@@ -50,6 +51,12 @@ SOFTWARE.
 #include "printutils.h"
 #include "ota.h"
 #include "wifi.h"
+
+void sml() { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); spl(__LINE__); }
+void sml(const char *v) { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); sp(__LINE__); sp(' '); spl(v); }
+void sml(char v) { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); sp(__LINE__); sp(' '); spl(v); }
+void sml(int v) { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); sp(__LINE__); sp(' '); spl(v); }
+#define SC(d,s) strcpy(d,s)
 
 #define ESP_SPI_FREQ 4000000
 /* IMAGE data */
@@ -206,42 +213,61 @@ bool hand_img_preview(void) {
     return true;
 }
 
+static int ul_cy=0, ul_cx=0;
+static unsigned char ul_coloridx=0;
+static unsigned char ul_col[3];
+
 void hand_post_img(void) {
 	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
+	//if(server.uri() != "/update") return; // check uri
 	HTTPUpload &upload = server.upload();
-	static int iw, ih;
-	static int cy=0, cx=0, ccolidx=0;
-	static unsigned char col[3];
+	String upload_error;
+	static const char *upload_error_str="NoErr";
+	// int ul_millis=millis(); // for yielding if we're slow
+
 	if (upload.status == UPLOAD_FILE_START) {
 		WiFiUDP::stopAll();
 		String filename = upload.filename;
 		//if (!filename.startsWith("/")) filename = "/"+filename;
-		//Serial.print("handleFileUpload Name: ");
-		//Serial.println(filename);
-
+		sp("handleFileUpload Name: ");
+		spl(filename);
 		//fsUploadFile = SPIFFS.open(filename, "w");     // Open the file for writing in SPIFFS (create if it doesn't exist)
 	} else if (upload.status == UPLOAD_FILE_WRITE) {
+		char val[30];
+		/* cmd_color(txtfg, SC(val, "r=50,b=200,g=100")); */
+		/* sprintf(val, "s=1,t=%d ", upload.currentSize); */
+		/* cmd_txt(val); */
+		/* //test_display(); */
+		/* yield(); */
 		for (int i=0; i<upload.currentSize; i++) {
-			col[ccolidx] = upload.buf[i];
-			ccolidx++;
-			if (ccolidx > 2) {
-				uint16_t color = rgb24to565(col[0], col[1], col[2]);
-				lcd.drawPixel(cx, cy, color);
-				cx++;
-				if (cx >= img_width) {
-					cx=0; cy++;
-					if (cy >= img_height) { }
+			/* upload_error=String("We received ") + String(upload.currentSize) + */
+			/* 	String(" bytes"); */
+			/* upload_error_str = upload_error.c_str(); */
+			//upload_error_str = "******************";
+			ul_col[ul_coloridx] = upload.buf[i];
+			ul_coloridx++;
+			if (ul_coloridx > 2) {
+				ul_coloridx = 0;
+				uint16_t color = rgb24to565(ul_col[0], ul_col[1], ul_col[2]);
+				/* if (1 || (ul_cx>0 && ul_cy==1)) { */
+				/* 	sprintf(val, "s=1,t=%d.%d ", ul_cx, ul_cy); */
+				/* 	cmd_txt(val); */
+				/* } */
+				lcd.drawPixel(ul_cx, ul_cy, color);
+				ul_cx++;
+				if (ul_cx >= lcd_width) {
+					ul_cx=0; ul_cy++;
+					if (ul_cy >= lcd_height) return; // don't go past end of lcd
 				}
-				ccolidx = 0;
 			}
+			/* if (!(i%10)) yield(); */
 		}
-
 		/* if (fsUploadFile) */
 		/* 	fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file */
 	} else if (upload.status == UPLOAD_FILE_END) {
-		ccolidx = cx = cy = 0;
-		col[0] = col[1] = col[2] = 0;
-		server.send(200, "text/plain", "k got milk");
+		ul_coloridx = ul_cx = ul_cy = 0;
+		ul_col[0] = ul_col[1] = ul_col[2] = 0;
+		server.send(200, "text/plain", upload_error_str);
 		/* if (fsUploadFile) {                                    // If the file was successfully created */
 		/* 	fsUploadFile.close();                               // Close the file again */
 		/* 	Serial.print("handleFileUpload Size: "); */
@@ -252,6 +278,7 @@ void hand_post_img(void) {
 		/* 	server.send(500, "text/plain", "500: couldn't create file"); */
 		/* } */
 	}
+	yield();
 }
 
 void hand_img_dims(void) {
@@ -298,10 +325,12 @@ bool hand_root(void) {
     return true;
 }
 bool hand_cmd_list() {
+	sml("hand_cmd_list()");
 	// /cs?font=&f=b&|=&txt=&
 	for (uint8_t i=0; i<server.args(); i++) {
 		String cmd=server.argName(i);
 		String vals;
+		sml();
 		sp("\nInput arg ["); sp(i); sp("]="); sp(cmd);
 		sp(" length="); spl(cmd.length());
 		vals = server.arg(i);
@@ -315,7 +344,9 @@ bool hand_cmd_list() {
 			cmd_txt(val);
 		} else if (cmd.equals("row")) {
 			spl("  COMMAND: row");
+			sml();
 			cmd_rgb_row(val);
+			sml();
 		} else if (cmd.equals("px")) {
 			spl("  COMMAND: px");
 			cmd_pixel(val);
@@ -346,14 +377,21 @@ bool hand_cmd_list() {
 		} else if (cmd.equals("hline")) {
 			spl("  COMMAND: row");
 			cmd_hline(val);
+		} else if (cmd.equals("line")) {
+			spl("  COMMAND: line");
+			cmd_line(val);
 		} else {
 			http500();
 			server.sendContent("Unknown command: " + cmd + "\n");
 		}
 	}
+	sml();
 	http200();
+	sml();
 	server.sendContent("k\n");
+	sml();
 	server.client().stop();
+	sml("/hand_cmd_list()");
     return true;
 }
 int cmd_off(char *val) {
@@ -408,6 +446,49 @@ int cmd_txt(char *opts) {
 
 void main_debug(String s) {
 	lcd.print(s);
+}
+
+int cmd_line(char *opts) {
+	sml("cmd_line()");
+	SubParams pset(opts); // for &row=y=#
+	char *var, *val;
+	uint16_t row[IMG_BIG_W];
+	uint16_t x1,x2,y1,y2=0;
+	ColorSet clr(0,0,0);
+	bool uclr=false; // user-chosen color selected
+	//memset(row, 255, IMG_BIG_W*3);
+	/* spl("Writing to row"); */
+	sml();
+	while (pset.next(&var, &val)) {
+		if (!strcmp(var, "x1")) x1 = !val ? 0 : strtol(val, NULL, 10);
+		else if (!strcmp(var, "x2")) x2 = !val ? 0 : strtol(val, NULL, 10);
+		else if (!strcmp(var, "y1")) y1 = !val ? 0 : strtol(val, NULL, 10);
+		else if (!strcmp(var, "y2")) y2 = !val ? 0 : strtol(val, NULL, 10);
+		else if (*var == 'r') clr.r = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else if (*var == 'g') clr.g = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else if (*var == 'b') clr.b = (!val ? 0 : strtol(val, NULL, 10)), uclr=true;
+		else {
+			http500();
+			server.sendContent("hline: Invalid opt");
+			return 1;
+		}
+	}
+	sml();
+	// sp("Writing to row: "); spl(y);
+	if (uclr) clr.updatec();
+	else      clr.c = nxtclr.c;
+	for (int i=0; i<IMG_BIG_W; i++) {
+		/* sp("r:"); sp(r); sp(" g:"); sp(g); sp(" b:"); spl(b); */
+		row[i] = clr.c;
+	}
+	// void drawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
+	sml("->drawLine()");
+	lcd.drawLine(x1,y1, x2,y2, clr.c);
+	sml("->/drawLine()");
+	//lcd.writeRow(row, *opts ? strtol(opts, NULL, 10) : 0);
+	/* spl("Wrote line"); */
+	sml("/cmd_line()");
+	return 0;
 }
 
 int cmd_hline(char *opts) {
@@ -483,10 +564,13 @@ uint8_t hex2_to_u8(char *s) { return HEXVAL(s[0])*16 + HEXVAL(s[1]); }
 uint16_t rowstr_to_colors(uint16_t *row, char *str, bool bgr) {
 	char *s = str;
 	uint16_t x=0;
+	sml();
 	spl("");
 	sp("rowstr_to_colors:");
 	spl(str);
+	sml();
 	for (; x<IMG_BIG_W; x++) {
+		sml();
 		uint8_t r, g, b;
 		if (!s[0] || !s[1]) break;
 		r = hex2_to_u8(s);  s+=2;
@@ -500,6 +584,7 @@ uint16_t rowstr_to_colors(uint16_t *row, char *str, bool bgr) {
 		/* sp(g); sp(' '); */
 		/* sp(r); */
 	}
+	sml();
 	/* spl(""); */
 	return x;
 }
@@ -512,8 +597,11 @@ int cmd_rgb_row(char *opts) {
 	int w=0, h=0;
 	uint16_t row[IMG_BIG_W];
 	uint16_t userwidth;
+	sml();
 	server.sendContent("cmd_rgb_row() called\n");
+	sml();
 	while (pset.next(&var, &val)) {
+		sml();
 		if (*var == 'y') y=strtol(val, NULL, 10);
 		else if (*var == 'x') x=strtol(val, NULL, 10);
 		else if (*var == 'w') w=strtol(val, NULL, 10);
@@ -523,7 +611,9 @@ int cmd_rgb_row(char *opts) {
 				server.sendContent("row: v missing value\n");
 				return 1;
 			} else {
+				sml();
 				userwidth = rowstr_to_colors(row, val, false);
+				sml();
 			}
 		} else {
 			http500();
@@ -531,7 +621,9 @@ int cmd_rgb_row(char *opts) {
 			return 1;
 		}
 	}
+	sml();
 	server.sendContent(" drawing...\n");
+	sml();
 	//lcd.drawRGBBitmap(0, y, row, IMG_BIG_W, 1);
 	//char s[5];
 	//sprintf(s, " %d ", y);
@@ -549,7 +641,9 @@ int cmd_rgb_row(char *opts) {
 	/* 	//row[i] = 0xffff; */
 	/* } */
 	/* spl("\nSending to lcd"); */
+	sml();
 	lcd.writeBlock(row, x, y, userwidth, 1);
+	sml();
 	//lcd.drawRGBBitmap(x, y, row, userwidth, 1);
 	server.sendContent(" done drawing...\n");
 	return 0;
@@ -656,7 +750,11 @@ void handleNotFound() {
 	digitalWrite ( LEDPIN, 0 );
 }
 
-#define SC(d,s) strcpy(d,s)
+void test_display() {
+	char val[30];
+	cmd_color(txtfg, SC(val, "b=200,g=100"));
+	cmd_txt(SC(val, "y=100,s=4,t= Test:\n"));
+}
 void initial_display() {
 	char val[30];
 	cmd_clear(SC(val, "r=0"));
@@ -704,11 +802,19 @@ void setup() {
 	server.on(F("/lcd"), hand_lcd_status );
 	server.on(F("/imgdim"), hand_img_dims );
 
-	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
-	server.on(F("/img"), HTTP_POST,
-		[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive
-		hand_post_img                 // Receive and save the file
-	);
+	server.onFileUpload(hand_post_img);
+	/* This doesn't work yet. */
+	server.on(F("/img"), HTTP_POST, hand_img_ul);
+		[](){
+			server.sendHeader("Connection", "close");
+			server.sendHeader("Access-Control-Allow-Origin", "*");
+			server.send(200, "text/plain", "uploaded, maybe");
+    }); // Send status 200 (OK) to tell the client we are ready to receive
+	/* server.on(F("/img"), HTTP_POST, */
+	/* 	[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive */
+	/* 	hand_post_img                 // Receive and save the file */
+	/* ); */
+
 
 	/* server.on(F("/tclr"), hand_tclr ); */
 	/* server.on(F("/font"), hand_font ); */
