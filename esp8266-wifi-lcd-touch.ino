@@ -51,6 +51,10 @@ SOFTWARE.
 #include "printutils.h"
 #include "ota.h"
 #include "wifi.h"
+#define PPM_REQUIRES_DATA
+#include <mini-ppm-info.h>
+//#include <src/library/mini-ppm-info/mini-ppm-info.h>
+
 
 void sml() { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); spl(__LINE__); }
 void sml(const char *v) { sp("T:"); sp(micros()); sp(' '); sp(__FILE__); sp(':'); sp(__LINE__); sp(' '); spl(v); }
@@ -87,8 +91,8 @@ ESP8266WebServer server(80); //main web server
 ESP8266HTTPUpdateServer httpUpdater;
 int img_width=0, img_height=0;
 uint16_t lcd_width=0, lcd_height=0;
-uint16_t ul_width, ul_height; // set in setup()
-uint16_t ul_maxval=255, ul_x=0, ul_y=0;
+struct ppm_info_st ppminfo = { .w=320, .h=200, .cmax=255, .d_off=0 };
+uint16_t ul_x=0, ul_y=0;
 uint8_t ul_invalid=0;
 
 #if 0
@@ -226,65 +230,21 @@ void hand_img_ul_done(void) {
 }
 
 void upload_init(void) {
-	String val;
-	if ((val=server.arg("w"))) ul_width=val.toInt();
-	if ((val=server.arg("h"))) ul_height=val.toInt();
-	if ((val=server.arg("x"))) ul_x=val.toInt();
-	if ((val=server.arg("y"))) ul_y=val.toInt();
 	server.sendHeader("Connection", "close");
 	server.sendHeader("Access-Control-Allow-Origin", "*");
-	/* char *s; */
-	/* asprintf(&s, "w=%d h=%d x=%d y=%d ", ul_width, ul_height, ul_x, ul_y); */
-	/* plaintext(s); */
-	/* free(s); */
-	//server.send(200, "text/plain", s);
-}
-
-// Returns 1 if a comment was skipped. *store is set to offset either way
-char skip_comment(uint16_t *store, char *b, uint16_t i, uint16_t buflen) {
-	if (b[i] != '#') {
-		*store = i;
-		return 0;
-	}
-	i++;
-	while (i<buflen && b[i] != '\n') i++;
-	if (b[i] == '\n') i++;
-	*store = i;
-	return 1;
-}
-
-// wxpfx: If whitespace at start is acceptable
-// returns new offset
-uint16_t skip_ws_comments(char *b, uint16_t i, uint16_t buflen, char wspfx) {
-	if (wspfx) i = skip_white(b, i, buflen);
-	for (; i<buflen; i++) {
-		if (b[i] == '#') {
-			i++;
-			for (; i<buflen && b[i] != '\n') i++;
-			if (b[i] == '\n') { i++; return i; }  // hit end of buf
-		}
-		if (isspace(b[i])) {
-			i++;
-		}
-	}
-	return i;
-}
-
-uint16_t skip_white(char *b, uint16_t i, uint16_t buflen) {
-	while (i<buflen && isspace(b[i]) i++;
-	return i;
+	server.send(200, "text/plain", 'k');
 }
 
 void hand_post_img(void) {
 	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
 	HTTPUpload &upload = server.upload();
 	String upload_error;
-	static const char *upload_error_str="NoErr";
+	static const char *upload_error_str="NoErr\n";
 	// int ul_millis=millis(); // for yielding if we're slow
 	//plaintext(server.uri().c_str());
 	//if(server.uri() != "/update") return; // check uri
 	static uint8_t nlcnt=0, comment_flag=0;
-	static unsigned char pnm_init=0;
+	static bool pnm_init=false;
 
 	if (upload.status == UPLOAD_FILE_START) {
 		#if DEBUG > 0
@@ -293,6 +253,7 @@ void hand_post_img(void) {
 			spl(filename);
 		#endif
 		upload_init();
+		pnm_init=false;
 		//fsUploadFile = SPIFFS.open(filename, "w");     // Open the file for writing in SPIFFS (create if it doesn't exist)
 	} else if (upload.status == UPLOAD_FILE_WRITE) {
 		/* yield(); return; */
@@ -304,65 +265,51 @@ void hand_post_img(void) {
 		/* yield(); */
 		// Handle PNM header
 		unsigned int i=0;
-		char *buf = upload.buf;
+		int8_t *buf = (int8_t *)upload.buf;
 		if (!pnm_init) {
-			char *endp;
-			while (skip_comment(&i, buf, i, upload.currentSize)) {}
-			if (buf[i++] != 'P' || buf[i++] != '6') {
+			if (get_ppm_info(&ppminfo, buf, upload.currentSize)) {
+				spl("Error in PPM");
 				ul_invalid = 1;
-				return;
+			} else if (ppminfo.cmax > 255) {
+				spl("Error: PPM cmax > 255");
+				ul_invalid = 1;
+			} else {
+				pnm_init=true;
+				ul_cx = ul_cy = 0;
+				sp("Width: "); sp(ppminfo.w);
+				sp(" Height: "); sp(ppminfo.h);
+				sp(" posx: "); sp(ul_x);
+				sp(" posy: "); sp(ul_y);
 			}
-			i = skip_white(buf, i, upload.currentSize);
-			while (skip_comment(&i, buf, i, upload.currentSize)) {}
-			ul_width = strtol(buf+i, &endp, 10);
-			i = endp-buf;
-			i = skip_white(buf, i, upload.currentSize);
-			while (skip_comment(&i, buf, i, upload.currentSize)) {}
-			ul_height = strtol(buf+i, &endp, 10);
-			i = endp-buf;
-			while (skip_comment(&i, buf, i, upload.currentSize)) {}
-			i = skip_white(buf, i, upload.currentSize);
-			ul_maxval = strtol(buf+i, &endp, 10);
-			i = endp-buf;
+			i = ppminfo.d_off;
 		}
-		for (; i<upload.currentSize && nlcnt < 3; i++) {
-			if (upload.buf[i] == '#') {
-				if (i>0 && buf[i-1] == '\n') comment_flag = 1;
-			} else if (upload.buf[i] == '\n') {
-				if (comment_flag) comment_flag = 0;
-				else nlcnt++;
-			}
-		}
-		if (nlcnt >= 3) {
-		for (; i<upload.currentSize; i++) {
-			/* upload_error=String("We received ") + String(upload.currentSize) + */
-			/* 	String(" bytes"); */
-			/* upload_error_str = upload_error.c_str(); */
-			//upload_error_str = "******************";
-			ul_col[ul_coloridx] = upload.buf[i];
-			ul_coloridx++;
-			if (ul_coloridx > 2) {
-				ul_coloridx = 0;
-				uint16_t color = rgb24to565(ul_col[0], ul_col[1], ul_col[2]);
-				/* if (1 || (ul_cx>0 && ul_cy==1)) { */
-				/* 	sprintf(val, "s=1,t=%d.%d ", ul_cx, ul_cy); */
-				/* 	cmd_txt(val); */
-				/* } */
-				uint16_t putx = ul_x + ul_cx;
-				uint16_t puty = ul_y + ul_cy;
-
-				// We just ignore out-of-bounds image data
-				if (putx < lcd_width && puty < lcd_height)
-					lcd.drawPixel(putx, puty, color);
-				// But we proceed to the next pixel/row of incoming data
-				ul_cx++;
-				if (ul_cx >= ul_width) {
-					ul_cx=0;
-					ul_cy++;
-					if (ul_cy >= ul_height) return; // don't go past end of lcd
+		if (pnm_init) {
+			for (; i<upload.currentSize; i++) {
+				ul_col[ul_coloridx] = upload.buf[i];
+				ul_coloridx++;
+				if (ul_coloridx > 2) {
+					ul_coloridx = 0;
+					uint16_t color = rgb24to565(ul_col[0], ul_col[1], ul_col[2]);
+					/* if (1 || (ul_cx>0 && ul_cy==1)) { */
+					/* 	sprintf(val, "s=1,t=%d.%d ", ul_cx, ul_cy); */
+					/* 	cmd_txt(val); */
+					/* } */
+					uint16_t putx = ul_x + ul_cx;
+					uint16_t puty = ul_y + ul_cy;
+	
+					// We just ignore out-of-bounds image data
+					if (putx < lcd_width && puty < lcd_height)
+						lcd.drawPixel(putx, puty, color);
+					// But we proceed to the next pixel/row of incoming data
+					ul_cx++;
+					if (ul_cx >= ppminfo.w) {
+						ul_cx=0;
+						ul_cy++;
+						if (ul_cy >= ppminfo.h) return; // don't go past end of lcd
+					}
 				}
+				/* if (!(i%10)) yield(); */
 			}
-			/* if (!(i%10)) yield(); */
 		}
 		/* if (fsUploadFile) */
 		/* 	fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file */
@@ -890,8 +837,8 @@ void setup() {
 	lcd.fillScreen(0);
 	lcd_width=lcd.width();
 	lcd_height=lcd.height();
-	ul_width=lcd_width;
-	ul_height=lcd_height;
+	ppminfo.w=lcd_width;
+	ppminfo.h=lcd_height;
 	sp("tftw =");
 	sp(lcd_width);
 	sp(" tfth =");
@@ -960,6 +907,7 @@ void loop() {
 	loop_millis=millis();
 	if (touch.isTouching()) {
 		touch.getPosition(x, y);
+		lcd.drawPixel(x, y, rgb24to565(255,0,255));
 		Serial.println("Touching... x: "+ String(x) + ", y: " + String(y));
 	}
 	//yield();

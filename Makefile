@@ -11,6 +11,8 @@ vi:
 		README.md \
 		esp8266-wifi-lcd-touch.ino \
 		esp8266-wifi-lcd-touch.h \
+		~/Arduino/libraries/mini-ppm-info/mini-ppm-info.cpp \
+		~/Arduino/libraries/mini-ppm-info/mini-ppm-info.h \
 		wifi.cpp \
 		wifi.h \
 		log.cpp \
