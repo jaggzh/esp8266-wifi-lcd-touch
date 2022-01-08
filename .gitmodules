@@ -1,0 +1,3 @@
+[submodule "mini-ppm-info"]
+	path = mini-ppm-info
+	url = https://github.com/jaggzh/mini-ppm-info

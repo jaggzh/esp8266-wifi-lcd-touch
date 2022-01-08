@@ -87,6 +87,9 @@ ESP8266WebServer server(80); //main web server
 ESP8266HTTPUpdateServer httpUpdater;
 int img_width=0, img_height=0;
 uint16_t lcd_width=0, lcd_height=0;
+uint16_t ul_width, ul_height; // set in setup()
+uint16_t ul_maxval=255, ul_x=0, ul_y=0;
+uint8_t ul_invalid=0;
 
 #if 0
 void drawButtons() {
@@ -217,29 +220,121 @@ static int ul_cy=0, ul_cx=0;
 static unsigned char ul_coloridx=0;
 static unsigned char ul_col[3];
 
+void hand_img_ul_done(void) {
+	server.send(200, "text/plain", "UL done");
+    // Send status 200 (OK) to tell the client we finished
+}
+
+void upload_init(void) {
+	String val;
+	if ((val=server.arg("w"))) ul_width=val.toInt();
+	if ((val=server.arg("h"))) ul_height=val.toInt();
+	if ((val=server.arg("x"))) ul_x=val.toInt();
+	if ((val=server.arg("y"))) ul_y=val.toInt();
+	server.sendHeader("Connection", "close");
+	server.sendHeader("Access-Control-Allow-Origin", "*");
+	/* char *s; */
+	/* asprintf(&s, "w=%d h=%d x=%d y=%d ", ul_width, ul_height, ul_x, ul_y); */
+	/* plaintext(s); */
+	/* free(s); */
+	//server.send(200, "text/plain", s);
+}
+
+// Returns 1 if a comment was skipped. *store is set to offset either way
+char skip_comment(uint16_t *store, char *b, uint16_t i, uint16_t buflen) {
+	if (b[i] != '#') {
+		*store = i;
+		return 0;
+	}
+	i++;
+	while (i<buflen && b[i] != '\n') i++;
+	if (b[i] == '\n') i++;
+	*store = i;
+	return 1;
+}
+
+// wxpfx: If whitespace at start is acceptable
+// returns new offset
+uint16_t skip_ws_comments(char *b, uint16_t i, uint16_t buflen, char wspfx) {
+	if (wspfx) i = skip_white(b, i, buflen);
+	for (; i<buflen; i++) {
+		if (b[i] == '#') {
+			i++;
+			for (; i<buflen && b[i] != '\n') i++;
+			if (b[i] == '\n') { i++; return i; }  // hit end of buf
+		}
+		if (isspace(b[i])) {
+			i++;
+		}
+	}
+	return i;
+}
+
+uint16_t skip_white(char *b, uint16_t i, uint16_t buflen) {
+	while (i<buflen && isspace(b[i]) i++;
+	return i;
+}
+
 void hand_post_img(void) {
 	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
-	//if(server.uri() != "/update") return; // check uri
 	HTTPUpload &upload = server.upload();
 	String upload_error;
 	static const char *upload_error_str="NoErr";
 	// int ul_millis=millis(); // for yielding if we're slow
+	//plaintext(server.uri().c_str());
+	//if(server.uri() != "/update") return; // check uri
+	static uint8_t nlcnt=0, comment_flag=0;
+	static unsigned char pnm_init=0;
 
 	if (upload.status == UPLOAD_FILE_START) {
-		WiFiUDP::stopAll();
-		String filename = upload.filename;
-		//if (!filename.startsWith("/")) filename = "/"+filename;
-		sp("handleFileUpload Name: ");
-		spl(filename);
+		#if DEBUG > 0
+			String filename = upload.filename;
+			sp("handleFileUpload Name: ");
+			spl(filename);
+		#endif
+		upload_init();
 		//fsUploadFile = SPIFFS.open(filename, "w");     // Open the file for writing in SPIFFS (create if it doesn't exist)
 	} else if (upload.status == UPLOAD_FILE_WRITE) {
-		char val[30];
+		/* yield(); return; */
+		/* char val[30]; */
 		/* cmd_color(txtfg, SC(val, "r=50,b=200,g=100")); */
 		/* sprintf(val, "s=1,t=%d ", upload.currentSize); */
 		/* cmd_txt(val); */
 		/* //test_display(); */
 		/* yield(); */
-		for (int i=0; i<upload.currentSize; i++) {
+		// Handle PNM header
+		unsigned int i=0;
+		char *buf = upload.buf;
+		if (!pnm_init) {
+			char *endp;
+			while (skip_comment(&i, buf, i, upload.currentSize)) {}
+			if (buf[i++] != 'P' || buf[i++] != '6') {
+				ul_invalid = 1;
+				return;
+			}
+			i = skip_white(buf, i, upload.currentSize);
+			while (skip_comment(&i, buf, i, upload.currentSize)) {}
+			ul_width = strtol(buf+i, &endp, 10);
+			i = endp-buf;
+			i = skip_white(buf, i, upload.currentSize);
+			while (skip_comment(&i, buf, i, upload.currentSize)) {}
+			ul_height = strtol(buf+i, &endp, 10);
+			i = endp-buf;
+			while (skip_comment(&i, buf, i, upload.currentSize)) {}
+			i = skip_white(buf, i, upload.currentSize);
+			ul_maxval = strtol(buf+i, &endp, 10);
+			i = endp-buf;
+		}
+		for (; i<upload.currentSize && nlcnt < 3; i++) {
+			if (upload.buf[i] == '#') {
+				if (i>0 && buf[i-1] == '\n') comment_flag = 1;
+			} else if (upload.buf[i] == '\n') {
+				if (comment_flag) comment_flag = 0;
+				else nlcnt++;
+			}
+		}
+		if (nlcnt >= 3) {
+		for (; i<upload.currentSize; i++) {
 			/* upload_error=String("We received ") + String(upload.currentSize) + */
 			/* 	String(" bytes"); */
 			/* upload_error_str = upload_error.c_str(); */
@@ -253,11 +348,18 @@ void hand_post_img(void) {
 				/* 	sprintf(val, "s=1,t=%d.%d ", ul_cx, ul_cy); */
 				/* 	cmd_txt(val); */
 				/* } */
-				lcd.drawPixel(ul_cx, ul_cy, color);
+				uint16_t putx = ul_x + ul_cx;
+				uint16_t puty = ul_y + ul_cy;
+
+				// We just ignore out-of-bounds image data
+				if (putx < lcd_width && puty < lcd_height)
+					lcd.drawPixel(putx, puty, color);
+				// But we proceed to the next pixel/row of incoming data
 				ul_cx++;
-				if (ul_cx >= lcd_width) {
-					ul_cx=0; ul_cy++;
-					if (ul_cy >= lcd_height) return; // don't go past end of lcd
+				if (ul_cx >= ul_width) {
+					ul_cx=0;
+					ul_cy++;
+					if (ul_cy >= ul_height) return; // don't go past end of lcd
 				}
 			}
 			/* if (!(i%10)) yield(); */
@@ -412,6 +514,12 @@ int cmd_font(char *name) { // f=[sbn]
 		return 1;
 	/* } */
 	/* return 0; */
+}
+void plaintext(const char *txt) {
+	char *cmd;
+	asprintf(&cmd, "t=%s", txt);
+	cmd_txt(cmd);
+	free(cmd);
 }
 int cmd_txt(char *opts) {
 	// t={text}  x=#  y=#
@@ -782,6 +890,8 @@ void setup() {
 	lcd.fillScreen(0);
 	lcd_width=lcd.width();
 	lcd_height=lcd.height();
+	ul_width=lcd_width;
+	ul_height=lcd_height;
 	sp("tftw =");
 	sp(lcd_width);
 	sp(" tfth =");
@@ -804,16 +914,7 @@ void setup() {
 
 	server.onFileUpload(hand_post_img);
 	/* This doesn't work yet. */
-	server.on(F("/img"), HTTP_POST, hand_img_ul);
-		[](){
-			server.sendHeader("Connection", "close");
-			server.sendHeader("Access-Control-Allow-Origin", "*");
-			server.send(200, "text/plain", "uploaded, maybe");
-    }); // Send status 200 (OK) to tell the client we are ready to receive
-	/* server.on(F("/img"), HTTP_POST, */
-	/* 	[](){ server.send(200); },    // Send status 200 (OK) to tell the client we are ready to receive */
-	/* 	hand_post_img                 // Receive and save the file */
-	/* ); */
+	server.on(F("/img"), HTTP_POST, hand_img_ul_done);
 
 
 	/* server.on(F("/tclr"), hand_tclr ); */
