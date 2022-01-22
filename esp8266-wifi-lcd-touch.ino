@@ -232,7 +232,7 @@ void hand_img_ul_done(void) {
 void upload_init(void) {
 	server.sendHeader("Connection", "close");
 	server.sendHeader("Access-Control-Allow-Origin", "*");
-	server.send(200, "text/plain", 'k');
+	server.send(200, "text/plain", "k");
 }
 
 void hand_post_img(void) {
