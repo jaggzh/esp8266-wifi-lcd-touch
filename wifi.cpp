@@ -8,9 +8,11 @@
 #include "wifi_config.h"
 #include "printutils.h"
 #include "wifi.h"
-#include "EspMQTTClient.h"
 
+#ifdef USE_MQTT
+#include "EspMQTTClient.h"
 EspMQTTClient mqtt_client(MQTT_IP, MQTT_PORT, MQTT_USER, MQTT_PW, MQTT_CLIENTNAME);
+#endif
 
 void setup_wifi(void) {
 	WiFi.mode(WIFI_STA);
@@ -38,7 +40,9 @@ bool setup_wait_wifi(int timeout_s) {
 }
 
 void loop_wifi() {        // Required for loop updates
-	//mqtt_client.loop();
+	#ifdef USE_MQTT
+		mqtt_client.loop();
+	#endif
 }
 
 bool loop_check_wifi() {
@@ -74,10 +78,12 @@ bool loop_check_wifi() {
 }
 
 void onConnectionEstablished() {
-	mqtt_client.subscribe("lr/lcd/px",[](const String & payload) {
-		mqtt_pixel(payload); },
-		/* main_debug(payload); }, */
-		1);
-		//Serial.println(payload);});
-	//client.publish("mytopic/test", "This is a message");
+	#ifdef USE_MQTT
+		mqtt_client.subscribe("lr/lcd/px",[](const String & payload) {
+			mqtt_pixel(payload); },
+			/* main_debug(payload); }, */
+			1);
+			//Serial.println(payload);});
+		//client.publish("mytopic/test", "This is a message");
+	#endif
 }
