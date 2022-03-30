@@ -205,19 +205,19 @@ void callback_writer(unsigned char *data, int size, int nmemb, void *cbdata) {
 bool hand_img_preview_by_pixel(void) {
 	http200plain();
 	mimebmp();
-    generateBitmapImageByRow(
-    		&callback_preview_row_by_pixel, &callback_writer, NULL, NULL,
-    		lcd.height(), lcd.width());
-    return true;
+	generateBitmapImageByRow(
+			&callback_preview_row_by_pixel, &callback_writer, NULL, NULL,
+			lcd.height(), lcd.width());
+	return true;
 }
 bool hand_img_preview(void) {
 	http200plain();
 	mimebmp();
-    generateBitmapImageByRow(
-    		&callback_preview_row_by_row, &callback_writer, NULL, NULL,
-    		lcd.height(), lcd.width());
+	generateBitmapImageByRow(
+			&callback_preview_row_by_row, &callback_writer, NULL, NULL,
+			lcd.height(), lcd.width());
 	server.client().stop();
-    return true;
+	return true;
 }
 
 static int ul_cy=0, ul_cx=0;
@@ -226,7 +226,7 @@ static unsigned char ul_col[3];
 
 void hand_img_ul_done(void) {
 	server.send(200, "text/plain", "UL done");
-    // Send status 200 (OK) to tell the client we finished
+	// Send status 200 (OK) to tell the client we finished
 }
 
 void upload_init(void) {
@@ -341,9 +341,9 @@ void hand_img_dims(void) {
 void hand_lcd_status(void) {
 	http200();
 	bool row_addr_order, col_addr_order, row_col_exchange,
-       vert_refresh, rgbbgr, hor_refresh;
+		vert_refresh, rgbbgr, hor_refresh;
 	lcd.readDisplayStatus(&row_addr_order, &col_addr_order,
-            &row_col_exchange, &vert_refresh, &rgbbgr, &hor_refresh);
+		    &row_col_exchange, &vert_refresh, &rgbbgr, &hor_refresh);
 	server.sendContent("<!DOCTYPE html><html><head><meta charset='UTF-8' /><title>Guidance</title>"
 		"<style type='text/css'>"
 		"</style></head><body><ul>");
@@ -371,7 +371,7 @@ bool hand_root(void) {
 	server.sendContent("</style></head><body>");
 	server.sendContent("</body></html>\n");
 	server.client().stop();
-    return true;
+	return true;
 }
 bool hand_cmd_list() {
 	sml("hand_cmd_list()");
@@ -441,7 +441,7 @@ bool hand_cmd_list() {
 	sml();
 	server.client().stop();
 	sml("/hand_cmd_list()");
-    return true;
+	return true;
 }
 int cmd_off(char *val) {
 	lcd.displayOff();
