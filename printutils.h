@@ -5,6 +5,7 @@
 	#include <Arduino.h>
 	#define sp(a)  (Serial.print(a))
 	#define spl(a) (Serial.println(a))
+	#define spf() (Serial.flush())
 	#ifdef DEBUG
 		#define dbsp(a)  (Serial.print(a))
 		#define dbspl(a) (Serial.println(a))
@@ -17,6 +18,7 @@
 #else
 	#define sp(a)  (cout << (a))
 	#define spl(a) (cout << (a) << "\n")
+	#define spf()  (cout.flush())
 	#ifdef DEBUG
 		#define dbsp(a)  (cout << (a))
 		#define dbspl(a) (cout << (a) << "\n")

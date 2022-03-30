@@ -230,13 +230,22 @@ void hand_img_ul_done(void) {
 }
 
 void upload_init(void) {
+	String val;
+	/* if ((val=server.arg("w"))) ul_width=val.toInt(); */
+	/* if ((val=server.arg("h"))) ul_height=val.toInt(); */
+	if ((val=server.arg("x"))) ul_x=val.toInt();
+	if ((val=server.arg("y"))) ul_y=val.toInt();
 	server.sendHeader("Connection", "close");
 	server.sendHeader("Access-Control-Allow-Origin", "*");
-	server.send(200, "text/plain", "k");
+	/* server.send(200, "text/plain", "k"); */
+	/* char s[100]; */
+	/* sprintf(s, "w=%d,h=%d,x=%d,y=%d", ul_width, ul_height, ul_x, ul_y); */
+	/* server.send(200, "text/plain", s); */
 }
 
 void hand_post_img(void) {
 	/* This doesn't work yet. Adafruit_GFX generally wants progmem for image data */
+	//if(server.uri() != "/update") return; // check uri
 	HTTPUpload &upload = server.upload();
 	String upload_error;
 	static const char *upload_error_str="NoErr\n";
@@ -245,8 +254,10 @@ void hand_post_img(void) {
 	//if(server.uri() != "/update") return; // check uri
 	static uint8_t nlcnt=0, comment_flag=0;
 	static bool pnm_init=false;
+	spl("Post image begun");
 
 	if (upload.status == UPLOAD_FILE_START) {
+		spl("upload_file_start");
 		#if DEBUG > 0
 			String filename = upload.filename;
 			sp("handleFileUpload Name: ");
@@ -266,7 +277,11 @@ void hand_post_img(void) {
 		// Handle PNM header
 		unsigned int i=0;
 		int8_t *buf = (int8_t *)upload.buf;
+		spl("UPload file write"); spf();
+		sp(" data size: ");
+		spl(upload.currentSize);
 		if (!pnm_init) {
+			spl("!pnm_init");
 			if (get_ppm_info(&ppminfo, buf, upload.currentSize)) {
 				spl("Error in PPM");
 				ul_invalid = 1;
@@ -284,6 +299,8 @@ void hand_post_img(void) {
 			i = ppminfo.d_off;
 		}
 		if (pnm_init) {
+			sp("looping through data: size: ");
+			spl(upload.currentSize);
 			for (; i<upload.currentSize; i++) {
 				ul_col[ul_coloridx] = upload.buf[i];
 				ul_coloridx++;
@@ -314,6 +331,7 @@ void hand_post_img(void) {
 		/* if (fsUploadFile) */
 		/* 	fsUploadFile.write(upload.buf, upload.currentSize); // Write the received bytes to the file */
 	} else if (upload.status == UPLOAD_FILE_END) {
+		spl("upload_file_end");
 		ul_coloridx = ul_cx = ul_cy = 0;
 		ul_col[0] = ul_col[1] = ul_col[2] = 0;
 		server.send(200, "text/plain", upload_error_str);
