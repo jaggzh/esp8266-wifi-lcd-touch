@@ -84,6 +84,7 @@ char stLast[20]="";
 int loop_millis=millis(); // at start of loop(), so everthing can use
 // Text colors
 ColorSet txtfg(255,255,255);
+char txtbg_trans=1;
 ColorSet txtbg(255,255,255); // adafruit says same == transparent bg
 ColorSet nxtclr(255,255,255);
 uint8_t txtsize=1;
@@ -201,6 +202,7 @@ unsigned char *callback_preview_row_by_row(void *cbd) {
 }
 void callback_writer(unsigned char *data, int size, int nmemb, void *cbdata) {
 	server.sendContent((const char*) data, size*nmemb);
+	yield();
 }
 bool hand_img_preview_by_pixel(void) {
 	http200plain();
@@ -282,7 +284,7 @@ void hand_post_img(void) {
 		spl(upload.currentSize);
 		if (!pnm_init) {
 			spl("!pnm_init");
-			if (get_ppm_info(&ppminfo, buf, upload.currentSize)) {
+			if (get_ppm_info(&ppminfo, (char *)buf, upload.currentSize)) {
 				spl("Error in PPM");
 				ul_invalid = 1;
 			} else if (ppminfo.cmax > 255) {
@@ -868,7 +870,8 @@ void setup() {
 	//drawButtons();
 	initial_display();
 	setup_wifi();
-	if (setup_wait_wifi(10)) lcd_notify_wifi_connect();  // wait max 10s
+	setup_wait_wifi(10);
+	//if (setup_wait_wifi(10)) lcd_notify_wifi_connect();  // wait max 10s
 	setup_ota();
 	sp(F("Connecting to wife..."));
 	server.on(F("/"), hand_root );
@@ -892,9 +895,12 @@ void setup() {
 	Serial.println ( F("HTTP svr started") );
 }
 
+// Disabled since we now display the strength itself
+// from wifi.cpp:show_wifi_strength()
+/*
 void lcd_notify_wifi_connect() {
 	uint16_t cx=lcd.getCursorX(), cy=lcd.getCursorY();
-	spl("Printing WIFI status");
+	spl(F"Printing WIFI status");
 
 	lcd.setTextSize(3);
 
@@ -910,12 +916,21 @@ void lcd_notify_wifi_connect() {
 	lcd.setTextSize(txtsize);
 	lcd.setCursor(cx, cy);
 }
+*/
+
+void set_text_color_honoring_trans(uint16_t fg) {
+	if (txtbg_trans) lcd.setTextColor(fg, fg);
+	else lcd.setTextColor(fg);
+}
+
 
 void loop() {
 	uint16_t x, y;
 	if (loop_check_wifi()) { // optional, for connection status Serial output
 		// just connected after being disconnected or at startup
-		lcd_notify_wifi_connect();
+		// Disabled since we now display the strength itself
+		// from wifi.cpp:show_wifi_strength()
+		//lcd_notify_wifi_connect();
 
 	}
 	loop_wifi();         // Required for loop updates

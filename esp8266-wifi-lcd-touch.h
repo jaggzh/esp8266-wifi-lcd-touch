@@ -1,3 +1,4 @@
+#include <Adafruit_ILI9341esp_read.h>
 #include "colorstuff.h"
 #include "esp-subparams.h"
 
@@ -18,5 +19,15 @@ void hand_lcd_status(void);
 void main_debug(String s); // output a string to lcd
 void lcd_notify_wifi_connect();
 uint16_t rowstr_to_colors(uint16_t *row, char *str, bool bgr=false);
+void set_text_color_honoring_trans(uint16_t fg);
 
 #define BOO(b) (b ? "True" : "False")
+
+#ifndef __MAIN_INO__
+extern Adafruit_ILI9341 lcd;
+extern ColorSet txtfg;
+extern ColorSet txtbg;
+extern ColorSet nxtclr;
+extern uint8_t txtsize;
+extern uint16_t lcd_width, lcd_height;
+#endif

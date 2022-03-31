@@ -45,12 +45,33 @@ void loop_wifi() {        // Required for loop updates
 	#endif
 }
 
+void show_wifi_strength() {
+	// init at -1 .. to know
+	static int16_t  last_x1=-1, last_y1;
+	static uint16_t last_w, last_h;
+	const int xoff=52, yoff=26; // offset from bottom right
+	const int xpos=lcd_width-xoff, ypos=lcd_height-yoff;
+	uint16_t cx=lcd.getCursorX(), cy=lcd.getCursorY();
+	//spl(F"Printing WIFI strength");
+	long rssi = WiFi.RSSI();
+	lcd.setTextSize(2);
+	lcd.setCursor(xpos, ypos);
+	// clear last text
+	if (last_x1 != -1) lcd.fillRect(last_x1, last_y1, last_w, last_h, 0);
+	lcd.setTextColor(rgb24to565(100,255,255), 0);
+	lcd.print(rssi);
+	lcd.getTextBounds(String(rssi), xpos, ypos, &last_x1, &last_y1, &last_w, &last_h);
+	set_text_color_honoring_trans(txtfg.c);
+	lcd.setTextSize(txtsize);
+	lcd.setCursor(cx, cy);
+}
+
 bool loop_check_wifi() {
 	static int connected=false;
 	int cur_millis = millis();
 	static int last_wifi_millis = cur_millis;
 	static int last_connect_millis = 0;
-	if (cur_millis - last_wifi_millis > 3000) {
+	if (cur_millis - last_wifi_millis > 4000) {
 		last_wifi_millis = cur_millis;
 		if (WiFi.status() == WL_CONNECTED) {
 			if (!connected) { // only if we toggled state
@@ -73,6 +94,7 @@ bool loop_check_wifi() {
 				spl(F("Lost WiFi connection. Will try again."));
 			}
 		}
+		show_wifi_strength();
 	}
 	return false;
 }
